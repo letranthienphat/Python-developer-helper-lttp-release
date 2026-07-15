@@ -1,17 +1,21 @@
 import os
 import re
+import ast
+import token
+import tokenize
 import shutil
 import subprocess
 import sys
 import threading
 import time
 import urllib.request
+from io import BytesIO
 from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, END, Scrollbar, Y, Frame, messagebox, filedialog, ttk
 
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.0.1"
+VERSION = "2.3.0"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 GITHUB_README_URL = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/README.md"
@@ -44,12 +48,12 @@ LANGUAGES = {
         "title": f"{APP_NAME} - v{VERSION}",
         "btn_exe": "1. Đóng gói EXE",
         "btn_lib": "2. Cài đặt thư viện",
-        "btn_fix": "3. Sửa lỗi File / Thư mục",
+        "btn_fix": "3. Sửa & Phục hồi File",
         "btn_paste": "4. Quét & Sửa Code Trực Tiếp",
         "btn_about": "5. Thông tin phần mềm",
         "btn_abort": "🛑 DỪNG KHẨN CẤP",
         "console_log": "Nhật ký hoạt động (Console Log):",
-        "ready": "Hệ thống đã sẵn sàng. Giao diện toàn màn hình, Đa luồng và Đa ngôn ngữ đã kích hoạt.",
+        "ready": "Hệ thống đã sẵn sàng. Tính năng khôi phục file cấu trúc .bak đã được tích hợp.",
         "welcome": f"Chào mừng bạn đến với {APP_NAME}!\nHãy chọn một tính năng bên menu trái để bắt đầu.",
         "build_title": "ĐÓNG GÓI ỨNG DỤNG (PYTHON SANG EXE)",
         "select_script": "Chọn file script:",
@@ -62,23 +66,24 @@ LANGUAGES = {
         "lib_req": "📄 Chọn file requirements.txt để cài đặt",
         "lib_manual_lbl": "Tự nhập tên thư viện cần cài (cách nhau bằng dấu cách):",
         "lib_manual_btn": "Cài đặt ngay",
-        "fix_title": "BỘ SỬA LỖI CODE TRÊN FILE & THƯ MỤC",
-        "fix_desc": "Tự động quét sửa lỗi cú pháp, thụt lề, ngoặc lệch, dấu ':'.\nTích hợp chế độ khắc phục nâng cao thông minh khi sửa lỗi cơ bản thất bại.",
+        "fix_title": "BỘ SỬA LỖI & PHỤC HỒI MÃ NGUỒN AN TOÀN",
+        "fix_desc": "Hệ thống quản lý file thông minh: Tự động tạo bản sao lưu trước khi sửa đổi, hỗ trợ rollback và khôi phục trạng thái code gốc từ file .bak chỉ với 1 click.",
         "fix_single": "📁 Chọn và sửa lỗi duy nhất 1 File .py",
-        "fix_dir": "🗂️ Chọn và quét sửa lỗi Toàn Bộ Thư Mục (An Toàn)",
+        "fix_dir": "🗂️ Chọn và quét sửa lỗi Toàn Bộ Thư Mục",
+        "fix_restore": "🔄 Khôi phục lại trạng thái cũ từ file .bak",
         "paste_title": "QUÉT & SỬA CODE PYTHON TRỰC TIẾP",
         "paste_lbl": "1. Dán mã Code cần sửa vào đây:",
-        "paste_out": " ✨ Kết quả đã sửa đổi & phục hồi lỗi:",
+        "paste_out": " ✨ Kết quả tối ưu & sửa lỗi sâu (Không mất Logic gốc):",
         "btn_copy": "📋 Sao chép (Copy)",
         "btn_download": "💾 Tải xuống (.py)",
-        "btn_trigger_fix": "⚡ BẮT ĐẦU QUÉT & TỰ ĐỘNG SỬA CODE",
+        "btn_trigger_fix": "⚡ BẮT ĐẦU QUÉT & TỰ ĐỘNG SỬA CODE MẠNH MẼ",
         "abort_msg": "⚠️ [HỆ THỐNG] ĐÃ BẤM DỪNG KHẨN CẤP! Đang ngắt luồng xử lý...",
         "success": "Thành công",
         "warning": "Cảnh báo",
         "error": "Lỗi",
         "notice": "Thông báo",
         "about_title": "THÔNG TIN PHẦN MỀM",
-        "about_desc": f"Phần mềm: {APP_NAME}\nPhiên bản hiện tại: {VERSION}\nTác giả: Lê Trần Thiên Phát\nEmail: {AUTHOR_EMAIL}\n\nCông cụ hỗ trợ nhà phát triển Python tối ưu hóa code, sửa lỗi nhanh, cài đặt thư viện tự động và đóng gói sản phẩm hoàn thiện.",
+        "about_desc": f"Phần mềm: {APP_NAME}\nPhiên bản hiện tại: {VERSION}\nTác giả: Lê Trần Thiên Phát\nEmail: {AUTHOR_EMAIL}\n\nCông cụ hỗ trợ nhà phát triển Python tối ưu hóa code, sửa lỗi nhanh, phục hồi dữ liệu từ file sao lưu, cài đặt thư viện tự động và đóng gói sản phẩm hoàn thiện.",
         "checking_update": "Đang kiểm tra phiên bản mới trực tuyến...",
         "up_to_date": "Bạn đang sử dụng phiên bản mới nhất!",
         "update_found": "Phát hiện phiên bản mới: {new_ver}!\nBạn có muốn tự động tải về và nâng cấp ngay lập tức không?",
@@ -88,12 +93,12 @@ LANGUAGES = {
         "title": f"{APP_NAME} - v{VERSION}",
         "btn_exe": "1. Build EXE Package",
         "btn_lib": "2. Install Libraries",
-        "btn_fix": "3. Fix File / Directory",
+        "btn_fix": "3. Fix & Restore File",
         "btn_paste": "4. Scan & Fix Code Directly",
         "btn_about": "5. About Software",
         "btn_abort": "🛑 EMERGENCY STOP",
         "console_log": "Activity Logs (Console Log):",
-        "ready": "System ready. Fullscreen display, Multi-Threading, and Multi-Language activated.",
+        "ready": "System ready. Backup rollback feature (.bak) has been successfully integrated.",
         "welcome": f"Welcome to {APP_NAME}!\nPlease select a feature from the left menu to start.",
         "build_title": "APPLICATION PACKAGING (PYTHON TO EXE)",
         "select_script": "Select script file:",
@@ -106,23 +111,24 @@ LANGUAGES = {
         "lib_req": "📄 Select requirements.txt file to install",
         "lib_manual_lbl": "Manually enter library names (separated by space):",
         "lib_manual_btn": "Install Now",
-        "fix_title": "CODE FIXER FOR FILES & DIRECTORIES",
-        "fix_desc": "Auto-scans syntax, indentation, unmatched brackets, and missing ':'.\nIntegrated with Smart Fallback Engine when normal fix attempts fail.",
+        "fix_title": "CODE FIXER & SAFE SOURCE RESTORATION",
+        "fix_desc": "Smart file management system: Auto-creates backups before modification, supports safe rollback, and restores original code from .bak files with 1 click.",
         "fix_single": "📁 Select and fix a Single .py File",
-        "fix_dir": "🗂️ Select and scan/fix Entire Directory (Safe Mode)",
+        "fix_dir": "🗂️ Select and scan/fix Entire Directory",
+        "fix_restore": "🔄 Restore original code from .bak file",
         "paste_title": "SCAN & FIX PYTHON CODE DIRECTLY",
         "paste_lbl": "1. Paste your Python code here:",
-        "paste_out": " ✨ Modified & Smart-Fixed Code Output:",
+        "paste_out": " ✨ Optimized & Deep-Fixed Code (Preserves Original Logic):",
         "btn_copy": "📋 Copy Code",
         "btn_download": "💾 Download (.py)",
-        "btn_trigger_fix": "⚡ START SCANNING & AUTO FIX CODE",
+        "btn_trigger_fix": "⚡ START DEEP SCAN & POWERFUL FIX",
         "abort_msg": "⚠️ [SYSTEM] EMERGENCY STOP TRIGGERED! Terminating processes...",
         "success": "Success",
         "warning": "Warning",
         "error": "Error",
         "notice": "Notice",
         "about_title": "SOFTWARE INFORMATION",
-        "about_desc": f"Software: {APP_NAME}\nCurrent Version: {VERSION}\nAuthor: Le Tran Thien Phat\nEmail: {AUTHOR_EMAIL}\n\nA tool to help Python developers optimize code, debug instantly, manage dependencies, and bundle applications.",
+        "about_desc": f"Software: {APP_NAME}\nCurrent Version: {VERSION}\nAuthor: Le Tran Thien Phat\nEmail: {AUTHOR_EMAIL}\n\nA tool to help Python developers optimize code, debug instantly, manage dependencies, restore backups, and bundle applications.",
         "checking_update": "Checking for updates online...",
         "up_to_date": "You are running the latest version!",
         "update_found": "New update available: {new_ver}!\nWould you like to automatically download and upgrade now?",
@@ -146,14 +152,13 @@ class PythonDeveloperToolGUI:
         threading.Thread(target=self.check_for_updates, daemon=True).start()
 
     def init_ui(self):
-        # Thiết lập cửa sổ mở rộng toàn màn hình
         try:
             if os.name == 'nt':
-                self.root.state('zoomed')  # Toàn màn hình trên Windows
+                self.root.state('zoomed')
             else:
-                self.root.wm_attributes('-zoomed', True)  # Toàn màn hình trên Linux
+                self.root.wm_attributes('-zoomed', True)
         except Exception:
-            self.root.geometry("1024x768")  # Dự phòng nếu lỗi
+            self.root.geometry("1024x768")
             
         self.root.minsize(950, 700)
         
@@ -317,7 +322,7 @@ class PythonDeveloperToolGUI:
                 new_code = response.read().decode('utf-8')
                 
             current_file_path = os.path.abspath(sys.argv[0])
-            shutil.copy2(current_file_path, current_file_path + ".old")
+            shutil.copy2(current_file_path, current_file_path + ".bak")
             
             with open(current_file_path, "w", encoding="utf-8") as f:
                 f.write(new_code)
@@ -471,7 +476,7 @@ class PythonDeveloperToolGUI:
                 if lib and lib not in builtin_libs: libraries.add(lib)
         return list(libraries)
 
-    # ==================== CHỨC NĂNG 3: SỬA LỖI FILE / THƯ MỤC ====================
+    # ==================== CHỨC NĂNG 3: SỬA LỖI & PHỤC HỒI TỪ FILE .BAK ====================
     def show_fix_code(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -484,13 +489,57 @@ class PythonDeveloperToolGUI:
             if f and os.path.abspath(f) != os.path.abspath(sys.argv[0]):
                 self.start_task_thread(self.process_fix_file, f)
 
-        Button(self.right_content, text=lang["fix_single"], command=run_single, bg="#d35400", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=10)
+        Button(self.right_content, text=lang["fix_single"], command=run_single, bg="#d35400", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=8)
 
         def run_dir():
             d = filedialog.askdirectory()
             if d: self.start_task_thread(self.process_fix_dir_thread, d)
 
-        Button(self.right_content, text=lang["fix_dir"], command=run_dir, bg="#c0392b", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=5)
+        Button(self.right_content, text=lang["fix_dir"], command=run_dir, bg="#c0392b", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=4)
+
+        # TÍNH NĂNG MỚI: PHỤC HỒI FILE GỐC TỪ FILE SAO LƯU (.BAK)
+        def run_restore_bak():
+            bak_file = filedialog.askopenfilename(filetypes=[("Backup Files", "*.bak")])
+            if bak_file:
+                self.start_task_thread(self.execute_restore_bak_thread, bak_file)
+
+        Button(self.right_content, text=lang["fix_restore"], command=run_restore_bak, bg="#2980b9", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=4)
+
+    def execute_restore_bak_thread(self, bak_file_path):
+        try:
+            lang = LANGUAGES[self.current_lang]
+            self.log(f"Attempting restoration from backup: {os.path.basename(bak_file_path)}")
+            
+            # Tính toán tên file .py gốc từ file .bak (Ví dụ: main.py.bak -> main.py)
+            if bak_file_path.endswith(".bak"):
+                py_file_path = bak_file_path[:-4] # Cắt bỏ cụm ".bak"
+            else:
+                py_file_path = bak_file_path + ".py" # Dự phòng
+            
+            if not os.path.exists(bak_file_path):
+                self.log(f"[Error] Backup file does not exist: {bak_file_path}")
+                messagebox.showerror(lang["error"], "File backup không tồn tại!")
+                return
+                
+            # Đọc thử file bak xem có dữ liệu không trước khi ghi đè tránh làm mất file trống
+            with open(bak_file_path, "r", encoding="utf-8", errors="ignore") as test_f:
+                content = test_f.read()
+                
+            if not content.strip():
+                self.log("[Warning] Selected backup file is empty. Restoration aborted.")
+                messagebox.showwarning(lang["warning"], "File backup trống rỗng, không thể khôi phục!")
+                return
+                
+            # Sao chép và khôi phục đè ngược lại file gốc .py
+            shutil.copy2(bak_file_path, py_file_path)
+            self.log(f"[Success] Restored original script successfully -> {os.path.basename(py_file_path)}")
+            messagebox.showinfo(lang["success"], f"Đã khôi phục file thành công về trạng thái cũ:\n{os.path.basename(py_file_path)}")
+            
+        except Exception as e:
+            self.log(f"[Error] Restoration failed: {e}")
+            messagebox.showerror(LANGUAGES[self.current_lang]["error"], f"Lỗi khôi phục: {e}")
+        finally:
+            self.end_task_status()
 
     def process_fix_dir_thread(self, dir_path):
         try:
@@ -519,10 +568,16 @@ class PythonDeveloperToolGUI:
             except: continue
         if not lines: return
         
+        # Tạo file .bak dự phòng an toàn trước khi chạy bộ sửa lỗi thông minh
+        try:
+            shutil.copy2(py_file, py_file + ".bak")
+        except:
+            pass
+
         fixed, new_lines = self.core_fix_algorithm_advanced(lines)
         if fixed and not self.is_aborted:
             with open(py_file, "w", encoding="utf-8") as f: f.writelines(new_lines)
-            self.log(f"Fixed: {os.path.basename(py_file)}")
+            self.log(f"Fixed & Backed up: {os.path.basename(py_file)}")
 
     # ==================== CHỨC NĂNG 4: QUÉT & SỬA CODE TRỰC TIẾP ====================
     def show_paste_code_fixer(self):
@@ -578,81 +633,135 @@ class PythonDeveloperToolGUI:
         if f:
             with open(f, "w", encoding="utf-8") as file: file.write(content)
 
-    # ==================== THUẬT TOÁN SỬA LỖI NÂNG CAO (SMART FALLBACK ENGINE) ====================
+    # ==================== HYBRID DIAGNOSTIC ENGINE V2.2 (SỬA CODE LAI) ====================
     def core_fix_algorithm_advanced(self, lines):
-        fixed, processed_lines = self.first_pass_fix(lines)
+        fixed, raw_fixed = self.first_pass_fix(lines)
+        raw_fixed = self.fix_indentation_via_tokens(raw_fixed)
         
-        try:
-            import ast
-            ast.parse("".join(processed_lines))
-            return fixed, processed_lines
-        except SyntaxError as e:
-            self.log(f"[Fallback Engine] First-pass failed on line {e.lineno}. Initiating Smart Recovery...")
-            error_line_index = e.lineno - 1
-            
-            if 0 <= error_line_index < len(processed_lines):
-                bad_line = processed_lines[error_line_index]
-                processed_lines[error_line_index] = f"# [Auto-Isolated due to syntax error] {bad_line}"
-                
-                try:
-                    ast.parse("".join(processed_lines))
-                    self.log("[Fallback Engine] Successfully resolved syntax error by isolating faulty lines.")
-                    return True, processed_lines
-                except:
+        attempts = 0
+        max_attempts = 10
+        
+        while attempts < max_attempts:
+            try:
+                ast.parse("".join(raw_fixed))
+                return True, raw_fixed
+            except SyntaxError as e:
+                attempts += 1
+                err_idx = e.lineno - 1
+                if 0 <= err_idx < len(raw_fixed):
+                    bad_line = raw_fixed[err_idx]
                     indent = bad_line[:len(bad_line) - len(bad_line.lstrip())]
-                    processed_lines[error_line_index] = f"{indent}pass  # Auto-Recovered\n"
-                    return True, processed_lines
                     
-        return fixed, processed_lines
+                    if "expected an indented block" in e.msg.lower():
+                        raw_fixed.insert(err_idx, f"{indent}    pass  # Injected to fix empty block\n")
+                        fixed = True
+                        continue
+                    
+                    if bad_line.strip().endswith(":"):
+                        if err_idx + 1 < len(raw_fixed):
+                            next_line = raw_fixed[err_idx + 1]
+                            if next_line.strip() and len(next_line) - len(next_line.lstrip()) <= len(indent):
+                                space_type = "    " if "    " in "".join(raw_fixed) else "\t"
+                                raw_fixed[err_idx + 1] = f"{indent}{space_type}{next_line.lstrip()}"
+                                fixed = True
+                                continue
+
+                    raw_fixed[err_idx] = f"{indent}pass  # [Logic Preserved / Fix Failed] {bad_line.lstrip()}"
+                    fixed = True
+                else:
+                    break
+        
+        return fixed, raw_fixed
+
+    def fix_indentation_via_tokens(self, lines):
+        try:
+            code_bytes = "".join(lines).encode('utf-8')
+            tokens = list(tokenize.tokenize(BytesIO(code_bytes).readline))
+        except Exception:
+            return lines
+
+        new_lines = list(lines)
+        for tok in tokens:
+            if tok.type == token.NAME and tok.string in ("def", "class", "if", "for", "while", "with", "try"):
+                line_idx = tok.start[0] - 1
+                if line_idx < len(new_lines):
+                    current_line = new_lines[line_idx]
+                    if current_line.strip() and not current_line.strip().endswith(":") and not current_line.strip().endswith("\\") and "#" not in current_line:
+                        new_lines[line_idx] = current_line.rstrip("\r\n") + ":\n"
+        return new_lines
 
     def first_pass_fix(self, lines):
         fixed = False
         new_lines = []
-        in_def_block = False
-        current_indent = 0
         
         for line in lines:
             stripped = line.strip()
-            if not stripped: new_lines.append(line); continue
+            if not stripped:
+                new_lines.append(line)
+                continue
             
-            # 1. Sửa thiếu dấu ':'
-            if stripped.startswith(("if ", "elif ", "else", "for ", "while ", "def ", "class ")) and not stripped.endswith(":") and not stripped.endswith("\\"):
-                line = line.rstrip("\r\n") + ":\n"; fixed = True; stripped = line.strip()
+            if stripped.startswith(("if ", "elif ", "else", "for ", "while ", "def ", "class ", "try", "except")) and not stripped.endswith(":") and not stripped.endswith("\\"):
+                if "#" not in stripped:
+                    line = line.rstrip("\r\n") + ":\n"
+                    fixed = True
+                    stripped = line.strip()
 
-            # 2. Sửa '=' sang '==' trong if
-            if stripped.startswith("if ") and "=" in stripped and "==" not in stripped:
-                match = re.search(r"if\s+(.*?)\s*=\s*(.*):", line)
+            if stripped.startswith("if ") and "=" in stripped and "==" not in stripped and "!=" not in stripped and "<=" not in stripped and ">=" not in stripped:
+                match = re.search(r"if\s+([a-zA-Z0-9_]+)\s*=\s*([^:]+):", line)
                 if match:
-                    line = f"{line[:len(line)-len(line.lstrip())]}if {match.group(1)} == {match.group(2)}:\n"
-                    fixed = True; stripped = line.strip()
+                    var_name, val = match.group(1), match.group(2)
+                    line = f"{line[:len(line)-len(line.lstrip())]}if {var_name} == {val}:\n"
+                    fixed = True
+                    stripped = line.strip()
 
-            # 3. Sửa print Python 2 -> 3
             if stripped.startswith("print ") and not stripped.startswith("print("):
-                line = f"{line[:len(line)-len(line.lstrip())]}print({stripped[6:].strip()})\n"; fixed = True; stripped = line.strip()
+                content = stripped[6:].strip()
+                line = f"{line[:len(line)-len(line.lstrip())]}print({content})\n"
+                fixed = True
+                stripped = line.strip()
 
-            # 4. Cân bằng ngoặc ()
-            op, cl = stripped.count("("), stripped.count(")")
-            if op > cl: line = line.rstrip("\r\n") + (")" * (op - cl)) + "\n"; fixed = True
-            elif cl > op: line = line.rstrip("\r\n").rstrip(")") + "\n"; fixed = True
+            if stripped.startswith("except ") and "," in stripped and " as " not in stripped:
+                match = re.search(r"except\s+([^,]+)\s*,\s*([^:]+):", line)
+                if match:
+                    err_type, err_var = match.group(1).strip(), match.group(2).strip()
+                    line = f"{line[:len(line)-len(line.lstrip())]}except {err_type} as {err_var}:\n"
+                    fixed = True
+                    stripped = line.strip()
 
-            # 5. Khắc phục chuỗi không đóng ngoặc nháy đơn/kép
-            if (stripped.count('"') % 2 != 0) and not stripped.endswith('\\'):
-                line = line.rstrip("\r\n") + '"\n'; fixed = True
-            elif (stripped.count("'") % 2 != 0) and not stripped.endswith('\\'):
-                line = line.rstrip("\r\n") + "'\n"; fixed = True
+            stack = []
+            bracket_map = {')': '(', ']': '[', '}': '{'}
+            reverse_map = {'(': ')', '[': ']', '{': '}'}
+            cleaned_line = []
+            
+            for char in stripped:
+                if char in reverse_map:
+                    stack.append(char)
+                    cleaned_line.append(char)
+                elif char in bracket_map:
+                    if stack and stack[-1] == bracket_map[char]:
+                        stack.pop()
+                        cleaned_line.append(char)
+                    else:
+                        fixed = True
+                else:
+                    cleaned_line.append(char)
+            
+            if stack:
+                missing_brackets = "".join([reverse_map[x] for x in reversed(stack)])
+                line = f"{line[:len(line)-len(line.lstrip())]}{''.join(cleaned_line)}{missing_brackets}\n"
+                fixed = True
+            else:
+                line = f"{line[:len(line)-len(line.lstrip())]}{''.join(cleaned_line)}\n"
 
-            # 6. Sửa lỗi dùng sai "with open" thiếu "as"
-            if stripped.startswith("with open") and " as " not in stripped:
-                line = line.rstrip("\r\n").rstrip(":") + " as f:\n"; fixed = True
-
-            # 7. Thụt lề cơ bản
-            if stripped.startswith(("if ", "elif ", "else", "for ", "while ", "def ")):
-                in_def_block = True; current_indent = len(line) - len(line.lstrip())
-            elif in_def_block:
-                if (len(line) - len(line.lstrip())) <= current_indent and stripped and not stripped.startswith(("elif", "else")):
-                    line = " " * (current_indent + 4) + line.lstrip(); fixed = True; in_def_block = False
+            if (stripped.count('"') % 2 != 0) and not stripped.endswith('\\') and '"""' not in stripped:
+                line = line.rstrip("\r\n") + '"\n'
+                fixed = True
+            elif (stripped.count("'") % 2 != 0) and not stripped.endswith('\\') and "'''" not in stripped:
+                line = line.rstrip("\r\n") + "'\n"
+                fixed = True
 
             new_lines.append(line)
+            
         return fixed, new_lines
 
 if __name__ == "__main__":
