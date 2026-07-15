@@ -15,11 +15,16 @@ from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, E
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
-GITHUB_README_URL = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/README.md"
-GITHUB_LATEST_CODE_URL = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/latest.py"
+
+# Hàm lấy URL không bị dính cache của GitHub CDN (Cache Busting)
+def get_anti_cache_url(base_url):
+    return f"{base_url}?t={int(time.time())}"
+
+GITHUB_README_BASE = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/README.md"
+GITHUB_LATEST_CODE_BASE = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/latest.py"
 
 # =====================================================================
 # TỰ ĐỘNG KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO CHÍNH NÓ (NẾU THIẾU)
@@ -53,7 +58,7 @@ LANGUAGES = {
         "btn_about": "5. Thông tin phần mềm",
         "btn_abort": "🛑 DỪNG KHẨN CẤP",
         "console_log": "Nhật ký hoạt động (Console Log):",
-        "ready": "Hệ thống đã sẵn sàng. Tính năng khôi phục file cấu trúc .bak đã được tích hợp.",
+        "ready": "Hệ thống sẵn sàng. Đã sửa lỗi cache GitHub và thêm nút cập nhật thủ công.",
         "welcome": f"Chào mừng bạn đến với {APP_NAME}!\nHãy chọn một tính năng bên menu trái để bắt đầu.",
         "build_title": "ĐÓNG GÓI ỨNG DỤNG (PYTHON SANG EXE)",
         "select_script": "Chọn file script:",
@@ -82,12 +87,13 @@ LANGUAGES = {
         "warning": "Cảnh báo",
         "error": "Lỗi",
         "notice": "Thông báo",
-        "about_title": "THÔNG TIN PHẦN MỀM",
+        "about_title": "THÔNG TIN PHẦN MỀM & CẬP NHẬT",
         "about_desc": f"Phần mềm: {APP_NAME}\nPhiên bản hiện tại: {VERSION}\nTác giả: Lê Trần Thiên Phát\nEmail: {AUTHOR_EMAIL}\n\nCông cụ hỗ trợ nhà phát triển Python tối ưu hóa code, sửa lỗi nhanh, phục hồi dữ liệu từ file sao lưu, cài đặt thư viện tự động và đóng gói sản phẩm hoàn thiện.",
-        "checking_update": "Đang kiểm tra phiên bản mới trực tuyến...",
-        "up_to_date": "Bạn đang sử dụng phiên bản mới nhất!",
+        "btn_manual_update": "🔄 KIỂM TRA & CẬP NHẬT NGAY",
+        "checking_update": "Đang kết nối GitHub bypass cache để kiểm tra phiên bản...",
+        "up_to_date": "Tuyệt vời! Bạn đang sử dụng phiên bản mới nhất trên GitHub!",
         "update_found": "Phát hiện phiên bản mới: {new_ver}!\nBạn có muốn tự động tải về và nâng cấp ngay lập tức không?",
-        "updating": "Đang tải bản cập nhật và cài đặt tự động..."
+        "updating": "Đang tiến hành tải bản cập nhật mới..."
     },
     "en": {
         "title": f"{APP_NAME} - v{VERSION}",
@@ -98,7 +104,7 @@ LANGUAGES = {
         "btn_about": "5. About Software",
         "btn_abort": "🛑 EMERGENCY STOP",
         "console_log": "Activity Logs (Console Log):",
-        "ready": "System ready. Backup rollback feature (.bak) has been successfully integrated.",
+        "ready": "System ready. GitHub CDN cache bypass and manual update button integrated.",
         "welcome": f"Welcome to {APP_NAME}!\nPlease select a feature from the left menu to start.",
         "build_title": "APPLICATION PACKAGING (PYTHON TO EXE)",
         "select_script": "Select script file:",
@@ -127,10 +133,11 @@ LANGUAGES = {
         "warning": "Warning",
         "error": "Error",
         "notice": "Notice",
-        "about_title": "SOFTWARE INFORMATION",
+        "about_title": "SOFTWARE INFORMATION & UPDATE",
         "about_desc": f"Software: {APP_NAME}\nCurrent Version: {VERSION}\nAuthor: Le Tran Thien Phat\nEmail: {AUTHOR_EMAIL}\n\nA tool to help Python developers optimize code, debug instantly, manage dependencies, restore backups, and bundle applications.",
-        "checking_update": "Checking for updates online...",
-        "up_to_date": "You are running the latest version!",
+        "btn_manual_update": "🔄 CHECK & UPDATE NOW",
+        "checking_update": "Connecting to GitHub bypassing cache to check for updates...",
+        "up_to_date": "Great! You are running the latest version available on GitHub!",
         "update_found": "New update available: {new_ver}!\nWould you like to automatically download and upgrade now?",
         "updating": "Downloading update and applying changes automatically..."
     }
@@ -148,8 +155,8 @@ class PythonDeveloperToolGUI:
         self.init_ui()
         self.update_ui_language()
         
-        # Khởi chạy luồng kiểm tra cập nhật ngay khi mở ứng dụng
-        threading.Thread(target=self.check_for_updates, daemon=True).start()
+        # Khởi chạy luồng tự động kiểm tra cập nhật ngầm khi mở app
+        threading.Thread(target=self.check_for_updates, args=(False,), daemon=True).start()
 
     def init_ui(self):
         try:
@@ -279,29 +286,39 @@ class PythonDeveloperToolGUI:
         lbl = Label(self.right_content, text=LANGUAGES[self.current_lang]["welcome"], font=("Segoe UI", 12), bg="white", fg="#555", pady=50)
         lbl.pack(fill=BOTH, expand=True)
 
-    # ==================== HỆ THỐNG TỰ ĐỘNG KIỂM TRA VÀ CẬP NHẬT ====================
-    def check_for_updates(self):
+    # ==================== HỆ THỐNG TỰ ĐỘNG KIỂM TRA VÀ CẬP NHẬT (ANTI-CACHE) ====================
+    def check_for_updates(self, is_manual=False):
         lang = LANGUAGES[self.current_lang]
         self.log(lang["checking_update"])
+        
         try:
-            req = urllib.request.Request(GITHUB_README_URL, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as response:
+            # Bypass cache bằng cách chèn timestamp vào cuối URL
+            anti_cache_url = get_anti_cache_url(GITHUB_README_BASE)
+            req = urllib.request.Request(anti_cache_url, headers={'User-Agent': 'Mozilla/5.0'})
+            
+            with urllib.request.urlopen(req, timeout=7) as response:
                 html = response.read().decode('utf-8')
                 
             match = re.search(r"Latest version:\s*([\d\.]+)", html, re.IGNORECASE)
             if match:
                 latest_version = match.group(1).strip()
-                self.log(f"[Update Checker] Current: {VERSION} | Latest on Github: {latest_version}")
+                self.log(f"[Update Checker] Local: {VERSION} | Live GitHub: {latest_version}")
                 
                 if self.is_newer_version(VERSION, latest_version):
-                    self.log(f"New update available: {latest_version}")
+                    self.log(f"New update found: {latest_version}")
                     self.root.after(100, lambda: self.ask_for_update(latest_version))
                 else:
                     self.log(lang["up_to_date"])
+                    if is_manual:
+                        self.root.after(100, lambda: messagebox.showinfo(lang["notice"], lang["up_to_date"]))
             else:
-                self.log("[Update Checker] No version info found in README.")
+                self.log("[Update Checker] Format 'Latest version: X.X.X' not found in README.")
+                if is_manual:
+                    messagebox.showwarning(lang["warning"], "Không tìm thấy thông tin phiên bản trên GitHub.")
         except Exception as e:
-            self.log(f"[Update Checker] Failed to check for updates: {e}")
+            self.log(f"[Update Checker] Connection failed: {e}")
+            if is_manual:
+                messagebox.showerror(lang["error"], f"Không thể kết nối đến GitHub: {e}")
 
     def is_newer_version(self, current, latest):
         c_parts = [int(x) for x in current.split(".")]
@@ -317,25 +334,26 @@ class PythonDeveloperToolGUI:
 
     def apply_update(self):
         try:
-            req = urllib.request.Request(GITHUB_LATEST_CODE_URL, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as response:
+            anti_cache_code_url = get_anti_cache_url(GITHUB_LATEST_CODE_BASE)
+            req = urllib.request.Request(anti_cache_code_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=12) as response:
                 new_code = response.read().decode('utf-8')
                 
             current_file_path = os.path.abspath(sys.argv[0])
-            shutil.copy2(current_file_path, current_file_path + ".bak")
+            shutil.copy2(current_file_path, current_file_path + ".bak") # Sao lưu dự phòng an toàn trước
             
             with open(current_file_path, "w", encoding="utf-8") as f:
                 f.write(new_code)
                 
             self.log("[Update] Code updated successfully! Exiting application...")
-            messagebox.showinfo("Update Done", "Cập nhật thành công! Phần mềm sẽ tự đóng để áp dụng phiên bản mới.")
+            messagebox.showinfo("Update Done", "Cập nhật thành công! Chương trình sẽ tự đóng để làm mới cấu trúc.")
             self.root.quit()
             sys.exit(0)
         except Exception as e:
             self.log(f"[Update Error] Update failed: {e}")
             messagebox.showerror("Update Error", f"Cập nhật thất bại: {e}")
 
-    # ==================== CHỨC NĂNG 5: THÔNG TIN PHẦN MỀM ====================
+    # ==================== CHỨC NĂNG 5: THÔNG TIN PHẦN MỀM & NÚT CẬP NHẬT THỦ CÔNG ====================
     def show_about_software(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -347,11 +365,18 @@ class PythonDeveloperToolGUI:
         lbl_desc.pack(anchor="w", pady=10)
         
         info_frame = Frame(self.right_content, bg="#f8f9fa", bd=1, relief="solid", padx=10, pady=10)
-        info_frame.pack(fill=X, pady=20)
+        info_frame.pack(fill=X, pady=10)
         
         Label(info_frame, text=f"Product Name: {APP_NAME}", font=("Consolas", 10, "bold"), bg="#f8f9fa").pack(anchor="w")
         Label(info_frame, text=f"Local Version: {VERSION}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
         Label(info_frame, text=f"Author Email: {AUTHOR_EMAIL}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
+
+        # NÚT BẤM CẬP NHẬT THỦ CÔNG ĐƯỢC THÊM VÀO ĐÂY
+        def trigger_manual_update_check():
+            threading.Thread(target=self.check_for_updates, args=(True,), daemon=True).start()
+
+        btn_update = Button(self.right_content, text=lang["btn_manual_update"], font=("Segoe UI", 11, "bold"), bg="#2980b9", fg="white", bd=0, pady=12, cursor="hand2", command=trigger_manual_update_check)
+        btn_update.pack(fill=X, pady=15)
 
     # ==================== CHỨC NĂNG 1: ĐÓNG GÓI EXE ====================
     def show_build_exe(self):
@@ -497,7 +522,6 @@ class PythonDeveloperToolGUI:
 
         Button(self.right_content, text=lang["fix_dir"], command=run_dir, bg="#c0392b", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=4)
 
-        # TÍNH NĂNG MỚI: PHỤC HỒI FILE GỐC TỪ FILE SAO LƯU (.BAK)
         def run_restore_bak():
             bak_file = filedialog.askopenfilename(filetypes=[("Backup Files", "*.bak")])
             if bak_file:
@@ -510,18 +534,16 @@ class PythonDeveloperToolGUI:
             lang = LANGUAGES[self.current_lang]
             self.log(f"Attempting restoration from backup: {os.path.basename(bak_file_path)}")
             
-            # Tính toán tên file .py gốc từ file .bak (Ví dụ: main.py.bak -> main.py)
             if bak_file_path.endswith(".bak"):
-                py_file_path = bak_file_path[:-4] # Cắt bỏ cụm ".bak"
+                py_file_path = bak_file_path[:-4]
             else:
-                py_file_path = bak_file_path + ".py" # Dự phòng
+                py_file_path = bak_file_path + ".py"
             
             if not os.path.exists(bak_file_path):
                 self.log(f"[Error] Backup file does not exist: {bak_file_path}")
                 messagebox.showerror(lang["error"], "File backup không tồn tại!")
                 return
                 
-            # Đọc thử file bak xem có dữ liệu không trước khi ghi đè tránh làm mất file trống
             with open(bak_file_path, "r", encoding="utf-8", errors="ignore") as test_f:
                 content = test_f.read()
                 
@@ -530,7 +552,6 @@ class PythonDeveloperToolGUI:
                 messagebox.showwarning(lang["warning"], "File backup trống rỗng, không thể khôi phục!")
                 return
                 
-            # Sao chép và khôi phục đè ngược lại file gốc .py
             shutil.copy2(bak_file_path, py_file_path)
             self.log(f"[Success] Restored original script successfully -> {os.path.basename(py_file_path)}")
             messagebox.showinfo(lang["success"], f"Đã khôi phục file thành công về trạng thái cũ:\n{os.path.basename(py_file_path)}")
@@ -568,7 +589,6 @@ class PythonDeveloperToolGUI:
             except: continue
         if not lines: return
         
-        # Tạo file .bak dự phòng an toàn trước khi chạy bộ sửa lỗi thông minh
         try:
             shutil.copy2(py_file, py_file + ".bak")
         except:
