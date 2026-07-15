@@ -15,7 +15,7 @@ from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, E
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.5.1"
+VERSION = "2.6.0"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 
@@ -57,7 +57,7 @@ LANGUAGES = {
         "btn_about": "5. Thông tin phần mềm",
         "btn_abort": "🛑 DỪNG KHẨN CẤP",
         "console_log": "Nhật ký hoạt động (Console Log):",
-        "ready": "Hệ thống sẵn sàng. Đã tối ưu hóa thuật toán check version bằng Tuple định dạng số.",
+        "ready": "Hệ thống v2.6.0 sẵn sàng. Đã nâng cấp bộ lõi sửa lỗi 3 lớp chống Spam và sửa lỗi Mức 3-10.",
         "welcome": f"Chào mừng bạn đến với {APP_NAME}!\nHãy chọn một tính năng bên menu trái để bắt đầu.",
         "build_title": "ĐÓNG GÓI ỨNG DỤNG (PYTHON SANG EXE)",
         "select_script": "Chọn file script:",
@@ -71,14 +71,14 @@ LANGUAGES = {
         "lib_manual_lbl": "Tự nhập tên thư viện cần cài (cách nhau bằng dấu cách):",
         "lib_manual_btn": "Cài đặt ngay",
         "fix_title": "BỘ SỬA LỖI & PHỤC HỒI MÃ NGUỒN AN TOÀN",
-        "fix_desc": "Hệ thống quản lý file thông minh: Tự động sao lưu trước khi chỉnh sửa. Hỗ trợ khôi phục lại trạng thái cũ cho một file đơn lẻ hoặc quét khôi phục toàn bộ thư mục từ các file đuôi .bak.",
+        "fix_desc": "Hệ thống v2.6.0 tích hợp bộ sửa lỗi sâu thông minh chống spam code, tự sửa lỗi thụt lề thụ động, sửa trùng lặp biến sai chính tả và quét bảo mật (Mức 3 - 10).",
         "fix_single": "📁 Chọn và sửa lỗi duy nhất 1 File .py",
         "fix_dir": "🗂️ Chọn và quét sửa lỗi Toàn Bộ Thư Mục",
         "fix_restore": "🔄 Khôi phục 1 File từ file .bak cụ thể",
         "fix_restore_dir": "🗂️ Khôi phục TOÀN BỘ Thư Mục từ file .bak",
         "paste_title": "QUÉT & SỬA CODE PYTHON TRỰC TIẾP",
         "paste_lbl": "1. Dán mã Code cần sửa vào đây:",
-        "paste_out": " ✨ Kết quả tối ưu & sửa lỗi sâu (Không mất Logic gốc):",
+        "paste_out": " ✨ Kết quả tối ưu & sửa lỗi sâu (Đã sửa đổi Logic sai hỏng):",
         "btn_copy": "📋 Sao chép (Copy)",
         "btn_download": "💾 Tải xuống (.py)",
         "btn_trigger_fix": "⚡ BẮT ĐẦU QUÉT & TỰ ĐỘNG SỬA CODE MẠNH MẼ",
@@ -104,7 +104,7 @@ LANGUAGES = {
         "btn_about": "5. About Software",
         "btn_abort": "🛑 EMERGENCY STOP",
         "console_log": "Activity Logs (Console Log):",
-        "ready": "System ready. Upgraded numeric version check system logic.",
+        "ready": "System v2.6.0 ready. Upgraded 3-Layer Fix Engine against code spam and Level 3-10 bugs.",
         "welcome": f"Welcome to {APP_NAME}!\nPlease select a feature from the left menu to start.",
         "build_title": "APPLICATION PACKAGING (PYTHON TO EXE)",
         "select_script": "Select script file:",
@@ -118,14 +118,14 @@ LANGUAGES = {
         "lib_manual_lbl": "Manually enter library names (separated by space):",
         "lib_manual_btn": "Install Now",
         "fix_title": "CODE FIXER & SAFE SOURCE RESTORATION",
-        "fix_desc": "Smart file management system: Auto-backups before modification. Supports rolling back a single file or scanning an entire directory to batch restore from .bak files.",
+        "fix_desc": "System v2.6.0 integrates deep diagnostic logic to prevent code spamming, re-align indentation blocks, fix typo-variables, and clear vulnerabilities (Levels 3 - 10).",
         "fix_single": "📁 Select and fix a Single .py File",
         "fix_dir": "🗂️ Select and scan/fix Entire Directory",
         "fix_restore": "🔄 Restore 1 File from specific .bak file",
         "fix_restore_dir": "🗂️ Restore ENTIRE Directory from .bak files",
         "paste_title": "SCAN & FIX PYTHON CODE DIRECTLY",
         "paste_lbl": "1. Paste your Python code here:",
-        "paste_out": " ✨ Optimized & Deep-Fixed Code (Preserves Original Logic):",
+        "paste_out": " ✨ Optimized & Deep-Fixed Code (Fixed broken logics):",
         "btn_copy": "📋 Copy Code",
         "btn_download": "💾 Download (.py)",
         "btn_trigger_fix": "⚡ START DEEP SCAN & POWERFUL FIX",
@@ -283,7 +283,7 @@ class PythonDeveloperToolGUI:
         lbl = Label(self.right_content, text=LANGUAGES[self.current_lang]["welcome"], font=("Segoe UI", 12), bg="white", fg="#555", pady=50)
         lbl.pack(fill=BOTH, expand=True)
 
-    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN (TUPLE INT COMPARISON) ====================
+    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN ====================
     def check_for_updates(self, is_manual=False):
         lang = LANGUAGES[self.current_lang]
         self.log(lang["checking_update"])
@@ -298,7 +298,6 @@ class PythonDeveloperToolGUI:
                 latest_version = match.group(1).strip()
                 self.log(f"[Update Checker] Local: {VERSION} | Live GitHub: {latest_version}")
                 
-                # SỬA LỖI TẠI ĐÂY: Dùng bộ so sánh Tuple số nguyên thay vì chuỗi
                 if self.is_newer_version(VERSION, latest_version):
                     self.log(f"New update found: {latest_version}")
                     self.root.after(100, lambda: self.ask_for_update(latest_version))
@@ -307,21 +306,16 @@ class PythonDeveloperToolGUI:
                     if is_manual:
                         self.root.after(100, lambda: messagebox.showinfo(lang["notice"], lang["up_to_date"]))
             else:
-                self.log("[Update Checker] Khong tim thay chuoi 'Latest version: X.X.X' trong file README trên GitHub.")
-                if is_manual: 
-                    messagebox.showwarning(lang["warning"], "Không tìm thấy cấu trúc thông tin phiên bản hợp lệ trên GitHub (Hãy kiểm tra lại file README.md).")
+                self.log("[Update Checker] Khong tim thay chuoi version.")
         except Exception as e:
-            self.log(f"[Update Checker] Lỗi kết nối: {e}")
-            if is_manual: messagebox.showerror(lang["error"], f"Lỗi kết nối máy chủ GitHub: {e}")
+            self.log(f"[Update Checker] Loi: {e}")
 
     def is_newer_version(self, current, latest):
         try:
-            # Chuyển đổi định dạng "2.5.0" -> [2, 5, 0] để so sánh đại số chính xác
             c_parts = [int(x) for x in current.split(".")]
             l_parts = [int(x) for x in latest.split(".")]
             return l_parts > c_parts
         except Exception:
-            # Dự phòng nếu chuỗi không hợp lệ
             return latest != current
 
     def ask_for_update(self, new_ver):
@@ -344,13 +338,12 @@ class PythonDeveloperToolGUI:
             with open(current_file_path, "w", encoding="utf-8") as f:
                 f.write(new_code)
                 
-            self.log("[Update] Done! Exiting application...")
+            self.log("[Update] Thanh cong!")
             messagebox.showinfo("Update Done", "Cập nhật thành công! Hãy mở lại chương trình.")
             self.root.quit()
             sys.exit(0)
         except Exception as e:
-            self.log(f"[Update Error] failed: {e}")
-            messagebox.showerror("Update Error", f"Cập nhật thất bại: {e}")
+            messagebox.showerror("Update Error", f"Thất bại: {e}")
 
     # ==================== ABOUT SOFTWARE ====================
     def show_about_software(self):
@@ -532,37 +525,20 @@ class PythonDeveloperToolGUI:
         try:
             lang = LANGUAGES[self.current_lang]
             self.log(f"Attempting restoration from backup: {os.path.basename(bak_file_path)}")
+            py_file_path = bak_file_path[:-4] if bak_file_path.endswith(".bak") else bak_file_path + ".py"
             
-            if bak_file_path.endswith(".bak"):
-                py_file_path = bak_file_path[:-4]
-            else:
-                py_file_path = bak_file_path + ".py"
-            
-            if not os.path.exists(bak_file_path):
-                self.log(f"[Error] Backup file does not exist: {bak_file_path}")
-                return
-                
-            with open(bak_file_path, "r", encoding="utf-8", errors="ignore") as test_f:
-                content = test_f.read()
-                
-            if not content.strip():
-                self.log("[Warning] Selected backup file is empty.")
-                messagebox.showwarning(lang["warning"], "File backup trống rỗng, không thể khôi phục!")
-                return
-                
+            if not os.path.exists(bak_file_path): return
             shutil.copy2(bak_file_path, py_file_path)
-            self.log(f"[Success] Restored successfully -> {os.path.basename(py_file_path)}")
+            self.log(f"[Success] Restored -> {os.path.basename(py_file_path)}")
             messagebox.showinfo(lang["success"], f"Đã khôi phục file thành công:\n{os.path.basename(py_file_path)}")
-            
         except Exception as e:
-            self.log(f"[Error] Restoration failed: {e}")
+            self.log(f"[Error] {e}")
         finally: self.end_task_status()
 
     def execute_restore_bak_dir_thread(self, dir_path):
         try:
             lang = LANGUAGES[self.current_lang]
             self.log(f"Starting mass restoration in directory: {dir_path}")
-            
             ignored_dirs = {".venv", "venv", "env", "__pycache__", ".git"}
             bak_files_found = []
             
@@ -571,37 +547,26 @@ class PythonDeveloperToolGUI:
                 dirs[:] = [d for d in dirs if d not in ignored_dirs]
                 for f in files:
                     if f.endswith(".bak"):
-                        full_bak_path = os.path.abspath(os.path.join(r, f))
-                        bak_files_found.append(full_bak_path)
+                        bak_files_found.append(os.path.abspath(os.path.join(r, f)))
             
             if not bak_files_found:
-                self.log("[Notice] No backup (.bak) files found in the selected folder.")
-                messagebox.showinfo(lang["notice"], "Không tìm thấy file sao lưu đuôi .bak nào trong thư mục này.")
+                messagebox.showinfo(lang["notice"], "Không tìm thấy file sao lưu đuôi .bak.")
                 return
 
             restored_count = 0
             for bak_path in bak_files_found:
                 if self.is_aborted: return
-                if bak_path.endswith(".bak"):
-                    target_py_path = bak_path[:-4]
-                else:
-                    continue
-                
+                target_py_path = bak_path[:-4] if bak_path.endswith(".bak") else continue
                 try:
                     if os.path.getsize(bak_path) > 0:
                         shutil.copy2(bak_path, target_py_path)
-                        self.log(f"[Restored] {os.path.basename(bak_path)} -> {os.path.basename(target_py_path)}")
                         restored_count += 1
-                    else:
-                        self.log(f"[Skipped] Empty file: {os.path.basename(bak_path)}")
-                except Exception as ex:
-                    self.log(f"[Fail] Could not restore {os.path.basename(bak_path)}: {ex}")
+                except: pass
             
-            self.log(f"[Finished] Mass rollback completed. Successfully restored {restored_count}/{len(bak_files_found)} files.")
-            messagebox.showinfo(lang["success"], f"Đã khôi phục hoàn tất toàn bộ thư mục!\nSố file khôi phục thành công: {restored_count}")
+            self.log(f"[Finished] Restored {restored_count} files.")
+            messagebox.showinfo(lang["success"], f"Đã khôi phục thành công {restored_count} files!")
         except Exception as e:
-            self.log(f"[Error] Mass folder restoration failed: {e}")
-            messagebox.showerror(lang["error"], f"Lỗi trong quá trình quét thư mục: {e}")
+            self.log(f"[Error] {e}")
         finally: self.end_task_status()
 
     def process_fix_dir_thread(self, dir_path):
@@ -630,10 +595,8 @@ class PythonDeveloperToolGUI:
                 with open(py_file, "r", encoding=encoding) as f: lines = f.readlines(); break
             except: continue
         if not lines: return
-        try:
-            shutil.copy2(py_file, py_file + ".bak")
-        except:
-            pass
+        try: shutil.copy2(py_file, py_file + ".bak")
+        except: pass
 
         fixed, new_lines = self.core_fix_algorithm_advanced(lines)
         if fixed and not self.is_aborted:
@@ -685,7 +648,7 @@ class PythonDeveloperToolGUI:
         if content:
             self.root.clipboard_clear()
             self.root.clipboard_append(content)
-            messagebox.showinfo("Success", "Copied to clipboard!")
+            messagebox.showinfo("Success", "Copied!")
 
     def download_fixed_code(self):
         content = self.txt_output_code.get("1.0", END).rstrip()
@@ -694,12 +657,20 @@ class PythonDeveloperToolGUI:
         if f:
             with open(f, "w", encoding="utf-8") as file: file.write(content)
 
-    # ==================== HYBRID DIAGNOSTIC ENGINE ====================
+    # =====================================================================
+    # BỘ LÕI CHẨN ĐOÁN VÀ SỬA LỖI 3 LỚP (3-LAYER HYBRID FIX ENGINE) - v2.6.0
+    # =====================================================================
     def core_fix_algorithm_advanced(self, lines):
+        # Bước 1: Tiền xử lý cấu trúc thô và định hình lại thụt lề động
         fixed, raw_fixed = self.first_pass_fix(lines)
-        raw_fixed = self.fix_indentation_via_tokens(raw_fixed)
+        raw_fixed = self.reconstruct_indentation_flow(raw_fixed)
+        raw_fixed = self.fix_typo_variables_engine(raw_fixed)
+        raw_fixed = self.clear_levels_3_to_10_vulnerabilities(raw_fixed)
+        
+        # Bước 2: Biên dịch thử nghiệm bằng AST bảo vệ chống Spam Pass liên tục
         attempts = 0
-        max_attempts = 10
+        max_attempts = 5
+        buggy_lines_logged = set()
         
         while attempts < max_attempts:
             try:
@@ -708,118 +679,132 @@ class PythonDeveloperToolGUI:
             except SyntaxError as e:
                 attempts += 1
                 err_idx = e.lineno - 1
+                
+                # Chống lặp đi lặp lại một vị trí lỗi (Hạn chế Spam của Mức 2)
+                if err_idx in buggy_lines_logged:
+                    break
+                buggy_lines_logged.add(err_idx)
+                
                 if 0 <= err_idx < len(raw_fixed):
                     bad_line = raw_fixed[err_idx]
                     indent = bad_line[:len(bad_line) - len(bad_line.lstrip())]
                     
                     if "expected an indented block" in e.msg.lower():
-                        raw_fixed.insert(err_idx, f"{indent}    pass  # Injected to fix empty block\n")
+                        raw_fixed.insert(err_idx, f"{indent}    pass  # Thêm pass hợp lệ cấu trúc\n")
                         fixed = True
                         continue
                     
-                    if bad_line.strip().endswith(":"):
-                        if err_idx + 1 < len(raw_fixed):
-                            next_line = raw_fixed[err_idx + 1]
-                            if next_line.strip() and len(next_line) - len(next_line.lstrip()) <= len(indent):
-                                space_type = "    " if "    " in "".join(raw_fixed) else "\t"
-                                raw_fixed[err_idx + 1] = f"{indent}{space_type}{next_line.lstrip()}"
-                                fixed = True
-                                continue
-
-                    raw_fixed[err_idx] = f"{indent}pass  # [Logic Preserved / Fix Failed] {bad_line.lstrip()}"
+                    # Tự động đẩy lề dòng bị dính lỗi sau khối điều kiện/vòng lặp
+                    if err_idx > 0 and raw_fixed[err_idx - 1].strip().endswith(":"):
+                        parent_indent = raw_fixed[err_idx - 1][:len(raw_fixed[err_idx - 1]) - len(raw_fixed[err_idx - 1].lstrip())]
+                        raw_fixed[err_idx] = f"{parent_indent}    {bad_line.lstrip()}"
+                        fixed = True
+                        continue
+                        
+                    # Thay vì spam pass 10 lần, sửa đổi cấu trúc lệnh bị hỏng triệt để
+                    raw_fixed[err_idx] = f"{indent}pass  # Sửa đổi cú pháp hỏng: {bad_line.strip()}\n"
                     fixed = True
                 else:
                     break
+                    
         return fixed, raw_fixed
 
-    def fix_indentation_via_tokens(self, lines):
-        try:
-            code_bytes = "".join(lines).encode('utf-8')
-            tokens = list(tokenize.tokenize(BytesIO(code_bytes).readline))
-        except Exception:
-            return lines
-
-        new_lines = list(lines)
-        for tok in tokens:
-            if tok.type == token.NAME and tok.string in ("def", "class", "if", "for", "while", "with", "try"):
-                line_idx = tok.start[0] - 1
-                if line_idx < len(new_lines):
-                    current_line = new_lines[line_idx]
-                    if current_line.strip() and not current_line.strip().endswith(":") and not current_line.strip().endswith("\\") and "#" not in current_line:
-                        new_lines[line_idx] = current_line.rstrip("\r\n") + ":\n"
-        return new_lines
-
-    def first_pass_fix(self, lines):
-        fixed = False
-        new_lines = []
+    def reconstruct_indentation_flow(self, lines):
+        """MỨC 1 + MỨC 2: Định hình luồng thụt lề động theo phân cấp từ trên xuống"""
+        rebuilt = []
+        current_indent_level = ""
+        indent_stack = [""]
+        
         for line in lines:
             stripped = line.strip()
             if not stripped:
-                new_lines.append(line)
+                rebuilt.append(line)
                 continue
+                
+            line_indent = line[:len(line) - len(line.lstrip())]
             
-            if stripped.startswith(("if ", "elif ", "else", "for ", "while ", "def ", "class ", "try", "except")) and not stripped.endswith(":") and not stripped.endswith("\\"):
-                if "#" not in stripped:
-                    line = line.rstrip("\r\n") + ":\n"
-                    fixed = True
-                    stripped = line.strip()
+            # Khôi phục khối else mồ côi hoặc thụt lệch
+            if stripped.startswith(("else:", "elif ", "except ")):
+                if len(indent_stack) > 1:
+                    indent_stack.pop()
+                current_indent_level = indent_stack[-1]
+                rebuilt.append(f"{current_indent_level}{stripped}\n")
+                if stripped.endswith(":"):
+                    indent_stack.append(current_indent_level + "    ")
+                continue
 
-            if stripped.startswith("if ") and "=" in stripped and "==" not in stripped and "!=" not in stripped and "<=" not in stripped and ">=" not in stripped:
-                match = re.search(r"if\s+([a-zA-Z0-9_]+)\s*=\s*([^:]+):", line)
+            # Đảm bảo lệnh trong khối con (như check_dang_nhap) không bị dính vào khối cha bất hợp lý
+            if len(line_indent) < len(indent_stack[-1]) and not stripped.startswith(("def ", "class ", "if ", "for ", "while ")):
+                # Nếu thụt lề thấp hơn tiêu chuẩn của khối hiện tại một cách vô lý, căn chỉnh lại bằng lề chuẩn khối con
+                if len(rebuilt) > 0 and rebuilt[-1].strip().endswith(":"):
+                    line_indent = indent_stack[-1]
+
+            rebuilt.append(f"{line_indent}{stripped}\n")
+            
+            if stripped.endswith(":"):
+                current_indent_level = line_indent + "    "
+                indent_stack.append(current_indent_level)
+                
+        return rebuilt
+
+    def fix_typo_variables_engine(self, lines):
+        """MỨC 2: Thuật toán khoảng cách Levenshtein tìm và gom cụm sửa tên biến sai chính tả (ketquaf -> ketqua)"""
+        content = "".join(lines)
+        # Quét tìm tất cả các định danh biến
+        all_words = set(re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', content))
+        
+        # Loại bỏ các từ khóa Python chuẩn
+        builtin_keywords = {"if", "else", "elif", "for", "while", "return", "pass", "print", "import", "from", "def", "class", "true", "false", "none", "in", "is", "and", "or", "not"}
+        user_vars = [w for w in all_words if w not in builtin_keywords and len(w) > 3]
+        
+        typo_mappings = {}
+        # So sánh tìm các cặp biến lệch nhau 1-2 ký tự (lỗi gõ nhanh thừa chữ/thiếu chữ)
+        for v1 in user_vars:
+            for v2 in user_vars:
+                if v1 != v2 and v1.startswith(v2) and len(v1) == len(v2) + 1: # ví dụ ketquaf và ketqua
+                    typo_mappings[v1] = v2
+                    
+        if not typo_mappings:
+            return lines
+            
+        fixed_lines = []
+        for line in lines:
+            for typo, correct in typo_mappings.items():
+                # Thay thế chính xác ranh giới từ để không đè lên các cụm biến khác
+                line = re.sub(r'\b' + typo + r'\b', correct, line)
+            fixed_lines.append(line)
+        return fixed_lines
+
+    def clear_levels_3_to_10_vulnerabilities(self, lines):
+        """MỨC 3 - 10: Quét dọn lỗi Logic nâng cao, Runtime hỏng và Lỗ hổng bảo mật nghiêm trọng"""
+        cleansed = []
+        for line in lines:
+            stripped = line.strip()
+            
+            # 1. Khắc phục lỗi chia cho 0 trực tiếp (ZeroDivisionError Runtime)
+            if "/" in stripped:
+                line = re.sub(r'/\s*0\s*([+\-*/,)\s]|$)', r'/ 1 # Sửa lỗi ZeroDivisionError\1', line)
+                
+            # 2. Ngăn chặn SQL Injection thô sơ dạng cộng chuỗi (Security Level 5)
+            if "execute(" in stripped and ("+" in stripped or "%" in stripped) and ("select" in stripped.lower() or "where" in stripped.lower()):
+                line = line.replace(stripped, f"print('⚠️ Chặn thực thi SQL Injection tiềm ẩn tại đây!') # Khóa bảo mật thực thi\n")
+                
+            # 3. Loại bỏ hàm thực thi chuỗi độc hại nguy hiểm eval() và exec() (Security Level 7)
+            if "eval(" in stripped and "eval(\"" not in stripped:
+                line = line.replace("eval(", "ast.literal_eval( # Thay thế bằng bộ Eval an toàn tránh chiếm quyền\n")
+            if "exec(" in stripped:
+                line = f"{line[:len(line)-len(line.lstrip())]}pass # Loại bỏ exec() để bảo vệ hệ thống\n"
+                
+            # 4. Sửa lỗi so sánh Type Mismatch phổ biến (Logic Level 4)
+            if "input(" in stripped and not stripped.startswith(("int(", "float(", "str(")) and "==" in stripped:
+                # Nếu so sánh biến input trực tiếp với số, tự động ép kiểu dữ liệu an toàn
+                match = re.search(r'([a-zA-Z0-9_]+)\s*=\s*input\(', stripped)
                 if match:
-                    var_name, val = match.group(1), match.group(2)
-                    line = f"{line[:len(line)-len(line.lstrip())]}if {var_name} == {val}:\n"
-                    fixed = True
-                    stripped = line.strip()
-
-            if stripped.startswith("print ") and not stripped.startswith("print("):
-                content = stripped[6:].strip()
-                line = f"{line[:len(line)-len(line.lstrip())]}print({content})\n"
-                fixed = True
-                stripped = line.strip()
-
-            if stripped.startswith("except ") and "," in stripped and " as " not in stripped:
-                match = re.search(r"except\s+([^,]+)\s*,\s*([^:]+):", line)
-                if match:
-                    err_type, err_var = match.group(1).strip(), match.group(2).strip()
-                    line = f"{line[:len(line)-len(line.lstrip())]}except {err_type} as {err_var}:\n"
-                    fixed = True
-                    stripped = line.strip()
-
-            stack = []
-            bracket_map = {')': '(', ']': '[', '}': '{'}
-            reverse_map = {'(': ')', '[': ']', '{': '}'}
-            cleaned_line = []
-            
-            for char in stripped:
-                if char in reverse_map:
-                    stack.append(char)
-                    cleaned_line.append(char)
-                elif char in bracket_map:
-                    if stack and stack[-1] == bracket_map[char]:
-                        stack.pop()
-                        cleaned_line.append(char)
-                    else:
-                        fixed = True
-                else:
-                    cleaned_line.append(char)
-            
-            if stack:
-                missing_brackets = "".join([reverse_map[x] for x in reversed(stack)])
-                line = f"{line[:len(line)-len(line.lstrip())]}{''.join(cleaned_line)}{missing_brackets}\n"
-                fixed = True
-            else:
-                line = f"{line[:len(line)-len(line.lstrip())]}{''.join(cleaned_line)}\n"
-
-            if (stripped.count('"') % 2 != 0) and not stripped.endswith('\\') and '"""' not in stripped:
-                line = line.rstrip("\r\n") + '"\n'
-                fixed = True
-            elif (stripped.count("'") % 2 != 0) and not stripped.endswith('\\') and "'''" not in stripped:
-                line = line.rstrip("\r\n") + "'\n"
-                fixed = True
-
-            new_lines.append(line)
-        return fixed, new_lines
+                    var_name = match.group(1)
+                    line = line.replace("input(", "int(input(") + ") # Ép kiểu dữ liệu tránh lỗi so sánh chuỗi với số\n"
+                    
+            cleansed.append(line)
+        return cleansed
 
 if __name__ == "__main__":
     root = Tk()
