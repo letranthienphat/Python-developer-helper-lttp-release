@@ -15,11 +15,10 @@ from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, E
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.4.0"
+VERSION = "2.5.0"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 
-# Hàm lấy URL không bị dính cache của GitHub CDN (Cache Busting)
 def get_anti_cache_url(base_url):
     return f"{base_url}?t={int(time.time())}"
 
@@ -58,7 +57,7 @@ LANGUAGES = {
         "btn_about": "5. Thông tin phần mềm",
         "btn_abort": "🛑 DỪNG KHẨN CẤP",
         "console_log": "Nhật ký hoạt động (Console Log):",
-        "ready": "Hệ thống sẵn sàng. Đã sửa lỗi cache GitHub và thêm nút cập nhật thủ công.",
+        "ready": "Hệ thống sẵn sàng. Đã tích hợp tính năng Khôi phục hàng loạt từ thư mục chứa file .bak.",
         "welcome": f"Chào mừng bạn đến với {APP_NAME}!\nHãy chọn một tính năng bên menu trái để bắt đầu.",
         "build_title": "ĐÓNG GÓI ỨNG DỤNG (PYTHON SANG EXE)",
         "select_script": "Chọn file script:",
@@ -72,10 +71,11 @@ LANGUAGES = {
         "lib_manual_lbl": "Tự nhập tên thư viện cần cài (cách nhau bằng dấu cách):",
         "lib_manual_btn": "Cài đặt ngay",
         "fix_title": "BỘ SỬA LỖI & PHỤC HỒI MÃ NGUỒN AN TOÀN",
-        "fix_desc": "Hệ thống quản lý file thông minh: Tự động tạo bản sao lưu trước khi sửa đổi, hỗ trợ rollback và khôi phục trạng thái code gốc từ file .bak chỉ với 1 click.",
+        "fix_desc": "Hệ thống quản lý file thông minh: Tự động sao lưu trước khi chỉnh sửa. Hỗ trợ khôi phục lại trạng thái cũ cho một file đơn lẻ hoặc quét khôi phục toàn bộ thư mục từ các file đuôi .bak.",
         "fix_single": "📁 Chọn và sửa lỗi duy nhất 1 File .py",
         "fix_dir": "🗂️ Chọn và quét sửa lỗi Toàn Bộ Thư Mục",
-        "fix_restore": "🔄 Khôi phục lại trạng thái cũ từ file .bak",
+        "fix_restore": "🔄 Khôi phục 1 File từ file .bak cụ thể",
+        "fix_restore_dir": "🗂️ Khôi phục TOÀN BỘ Thư Mục từ file .bak",
         "paste_title": "QUÉT & SỬA CODE PYTHON TRỰC TIẾP",
         "paste_lbl": "1. Dán mã Code cần sửa vào đây:",
         "paste_out": " ✨ Kết quả tối ưu & sửa lỗi sâu (Không mất Logic gốc):",
@@ -104,7 +104,7 @@ LANGUAGES = {
         "btn_about": "5. About Software",
         "btn_abort": "🛑 EMERGENCY STOP",
         "console_log": "Activity Logs (Console Log):",
-        "ready": "System ready. GitHub CDN cache bypass and manual update button integrated.",
+        "ready": "System ready. Batch restoration from directory containing .bak files is now supported.",
         "welcome": f"Welcome to {APP_NAME}!\nPlease select a feature from the left menu to start.",
         "build_title": "APPLICATION PACKAGING (PYTHON TO EXE)",
         "select_script": "Select script file:",
@@ -118,10 +118,11 @@ LANGUAGES = {
         "lib_manual_lbl": "Manually enter library names (separated by space):",
         "lib_manual_btn": "Install Now",
         "fix_title": "CODE FIXER & SAFE SOURCE RESTORATION",
-        "fix_desc": "Smart file management system: Auto-creates backups before modification, supports safe rollback, and restores original code from .bak files with 1 click.",
+        "fix_desc": "Smart file management system: Auto-backups before modification. Supports rolling back a single file or scanning an entire directory to batch restore from .bak files.",
         "fix_single": "📁 Select and fix a Single .py File",
         "fix_dir": "🗂️ Select and scan/fix Entire Directory",
-        "fix_restore": "🔄 Restore original code from .bak file",
+        "fix_restore": "🔄 Restore 1 File from specific .bak file",
+        "fix_restore_dir": "🗂️ Restore ENTIRE Directory from .bak files",
         "paste_title": "SCAN & FIX PYTHON CODE DIRECTLY",
         "paste_lbl": "1. Paste your Python code here:",
         "paste_out": " ✨ Optimized & Deep-Fixed Code (Preserves Original Logic):",
@@ -146,16 +147,13 @@ LANGUAGES = {
 class PythonDeveloperToolGUI:
     def __init__(self, root):
         self.root = root
-        self.current_lang = "vi"  # Mặc định tiếng Việt
-        
-        # Biến điều khiển đa luồng và cập nhật
+        self.current_lang = "vi"
         self.is_aborted = False
         self.current_thread = None
         
         self.init_ui()
         self.update_ui_language()
         
-        # Khởi chạy luồng tự động kiểm tra cập nhật ngầm khi mở app
         threading.Thread(target=self.check_for_updates, args=(False,), daemon=True).start()
 
     def init_ui(self):
@@ -172,7 +170,7 @@ class PythonDeveloperToolGUI:
         self.style = ttk.Style()
         self.style.theme_use('clam')
         
-        # --- HEADER ROW ---
+        # --- HEADER ---
         self.title_frame = Frame(self.root, bg="#2c3e50")
         self.title_frame.pack(fill=X)
         
@@ -182,7 +180,7 @@ class PythonDeveloperToolGUI:
         self.btn_lang_toggle = Button(self.title_frame, text="English 🌐", font=("Segoe UI", 9, "bold"), bg="#34495e", fg="white", bd=0, padx=12, pady=5, cursor="hand2", command=self.toggle_language)
         self.btn_lang_toggle.pack(side=RIGHT, padx=15, pady=8)
 
-        # --- MAIN CONTAINER ---
+        # --- MAIN FRAME ---
         main_frame = Frame(self.root)
         main_frame.pack(fill=BOTH, expand=True, padx=10, pady=10)
         
@@ -193,7 +191,7 @@ class PythonDeveloperToolGUI:
         self.right_content = Frame(main_frame, bg="white", padx=10, pady=5)
         self.right_content.pack(side=RIGHT, fill=BOTH, expand=True)
         
-        # --- LEFT MENU BUTTONS ---
+        # --- MENU BUTTONS ---
         self.lbl_menu_header = Label(self.left_menu, text="CHỨC NĂNG / FEATURES", font=("Segoe UI", 10, "bold"), bg="#ecf0f1", fg="#2c3e50", pady=5)
         self.lbl_menu_header.pack(fill=X)
         
@@ -214,7 +212,6 @@ class PythonDeveloperToolGUI:
         self.btn5 = Button(self.left_menu, text="", command=self.show_about_software, **self.btn_style)
         self.btn5.pack(fill=X, pady=4)
         
-        # Đẩy nút dừng khẩn cấp xuống đáy menu
         lbl_space = Label(self.left_menu, bg="#ecf0f1")
         lbl_space.pack(fill=BOTH, expand=True)
         
@@ -222,7 +219,7 @@ class PythonDeveloperToolGUI:
         self.btn_abort.pack(fill=X, pady=10)
         self.btn_abort.config(state="disabled")
         
-        # --- BOTTOM CONSOLE LOG ---
+        # --- BOTTOM CONSOLE ---
         log_frame = Frame(self.root, padx=10, pady=5)
         log_frame.pack(fill=X, side=TOP)
         
@@ -286,16 +283,13 @@ class PythonDeveloperToolGUI:
         lbl = Label(self.right_content, text=LANGUAGES[self.current_lang]["welcome"], font=("Segoe UI", 12), bg="white", fg="#555", pady=50)
         lbl.pack(fill=BOTH, expand=True)
 
-    # ==================== HỆ THỐNG TỰ ĐỘNG KIỂM TRA VÀ CẬP NHẬT (ANTI-CACHE) ====================
+    # ==================== UPDATE SYSTEM ====================
     def check_for_updates(self, is_manual=False):
         lang = LANGUAGES[self.current_lang]
         self.log(lang["checking_update"])
-        
         try:
-            # Bypass cache bằng cách chèn timestamp vào cuối URL
             anti_cache_url = get_anti_cache_url(GITHUB_README_BASE)
             req = urllib.request.Request(anti_cache_url, headers={'User-Agent': 'Mozilla/5.0'})
-            
             with urllib.request.urlopen(req, timeout=7) as response:
                 html = response.read().decode('utf-8')
                 
@@ -312,13 +306,11 @@ class PythonDeveloperToolGUI:
                     if is_manual:
                         self.root.after(100, lambda: messagebox.showinfo(lang["notice"], lang["up_to_date"]))
             else:
-                self.log("[Update Checker] Format 'Latest version: X.X.X' not found in README.")
-                if is_manual:
-                    messagebox.showwarning(lang["warning"], "Không tìm thấy thông tin phiên bản trên GitHub.")
+                self.log("[Update Checker] No version found in README.")
+                if is_manual: messagebox.showwarning(lang["warning"], "Không tìm thấy thông tin trên GitHub.")
         except Exception as e:
-            self.log(f"[Update Checker] Connection failed: {e}")
-            if is_manual:
-                messagebox.showerror(lang["error"], f"Không thể kết nối đến GitHub: {e}")
+            self.log(f"[Update Checker] Failed: {e}")
+            if is_manual: messagebox.showerror(lang["error"], f"Lỗi kết nối: {e}")
 
     def is_newer_version(self, current, latest):
         c_parts = [int(x) for x in current.split(".")]
@@ -340,20 +332,20 @@ class PythonDeveloperToolGUI:
                 new_code = response.read().decode('utf-8')
                 
             current_file_path = os.path.abspath(sys.argv[0])
-            shutil.copy2(current_file_path, current_file_path + ".bak") # Sao lưu dự phòng an toàn trước
+            shutil.copy2(current_file_path, current_file_path + ".bak")
             
             with open(current_file_path, "w", encoding="utf-8") as f:
                 f.write(new_code)
                 
-            self.log("[Update] Code updated successfully! Exiting application...")
-            messagebox.showinfo("Update Done", "Cập nhật thành công! Chương trình sẽ tự đóng để làm mới cấu trúc.")
+            self.log("[Update] Done! Exiting application...")
+            messagebox.showinfo("Update Done", "Cập nhật thành công! Hãy mở lại chương trình.")
             self.root.quit()
             sys.exit(0)
         except Exception as e:
-            self.log(f"[Update Error] Update failed: {e}")
+            self.log(f"[Update Error] failed: {e}")
             messagebox.showerror("Update Error", f"Cập nhật thất bại: {e}")
 
-    # ==================== CHỨC NĂNG 5: THÔNG TIN PHẦN MỀM & NÚT CẬP NHẬT THỦ CÔNG ====================
+    # ==================== ABOUT SOFTWARE ====================
     def show_about_software(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -371,14 +363,13 @@ class PythonDeveloperToolGUI:
         Label(info_frame, text=f"Local Version: {VERSION}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
         Label(info_frame, text=f"Author Email: {AUTHOR_EMAIL}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
 
-        # NÚT BẤM CẬP NHẬT THỦ CÔNG ĐƯỢC THÊM VÀO ĐÂY
         def trigger_manual_update_check():
             threading.Thread(target=self.check_for_updates, args=(True,), daemon=True).start()
 
-        btn_update = Button(self.right_content, text=lang["btn_manual_update"], font=("Segoe UI", 11, "bold"), bg="#2980b9", fg="white", bd=0, pady=12, cursor="hand2", command=trigger_manual_update_check)
+        btn_update = Button(self.right_content, text=lang["btn_manual_update"], font=("Segoe UI", 11, "bold"), bg="#2980b9", fg="white", bd=0, pady=12, command=trigger_manual_update_check)
         btn_update.pack(fill=X, pady=15)
 
-    # ==================== CHỨC NĂNG 1: ĐÓNG GÓI EXE ====================
+    # ==================== BUILD EXE ====================
     def show_build_exe(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -440,7 +431,7 @@ class PythonDeveloperToolGUI:
 
         Button(self.right_content, text=lang["btn_start_build"], command=trigger_build, bg="#27ae60", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=10).pack(fill=X, pady=20)
 
-    # ==================== CHỨC NĂNG 2: CÀI ĐẶT THƯ VIỆN ====================
+    # ==================== PIP LIBRARIES ====================
     def show_install_libs(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -501,7 +492,7 @@ class PythonDeveloperToolGUI:
                 if lib and lib not in builtin_libs: libraries.add(lib)
         return list(libraries)
 
-    # ==================== CHỨC NĂNG 3: SỬA LỖI & PHỤC HỒI TỪ FILE .BAK ====================
+    # ==================== FIX CODE & RESTORATION (.BAK) ====================
     def show_fix_code(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -509,25 +500,30 @@ class PythonDeveloperToolGUI:
         Label(self.right_content, text=lang["fix_title"], font=("Segoe UI", 13, "bold"), bg="white", fg="#2c3e50").pack(anchor="w", pady=10)
         Label(self.right_content, text=lang["fix_desc"], font=("Segoe UI", 10), justify=LEFT, bg="white", fg="#666").pack(anchor="w", pady=5)
 
+        # 1. Sửa file đơn lẻ
         def run_single():
             f = filedialog.askopenfilename(filetypes=[("Python Files", "*.py")])
             if f and os.path.abspath(f) != os.path.abspath(sys.argv[0]):
                 self.start_task_thread(self.process_fix_file, f)
+        Button(self.right_content, text=lang["fix_single"], command=run_single, bg="#d35400", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
-        Button(self.right_content, text=lang["fix_single"], command=run_single, bg="#d35400", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=8)
-
+        # 2. Quét sửa toàn bộ thư mục
         def run_dir():
             d = filedialog.askdirectory()
             if d: self.start_task_thread(self.process_fix_dir_thread, d)
+        Button(self.right_content, text=lang["fix_dir"], command=run_dir, bg="#c0392b", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
-        Button(self.right_content, text=lang["fix_dir"], command=run_dir, bg="#c0392b", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=4)
-
+        # 3. Khôi phục 1 file từ file .bak chọn lọc
         def run_restore_bak():
             bak_file = filedialog.askopenfilename(filetypes=[("Backup Files", "*.bak")])
-            if bak_file:
-                self.start_task_thread(self.execute_restore_bak_thread, bak_file)
+            if bak_file: self.start_task_thread(self.execute_restore_bak_thread, bak_file)
+        Button(self.right_content, text=lang["fix_restore"], command=run_restore_bak, bg="#2980b9", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
-        Button(self.right_content, text=lang["fix_restore"], command=run_restore_bak, bg="#2980b9", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=4)
+        # 4. TÍNH NĂNG MỚI: QUÉT VÀ KHÔI PHỤC HÀNG LOẠT THEO THƯ MỤC CHỨA FILE .BAK
+        def run_restore_bak_dir():
+            d = filedialog.askdirectory()
+            if d: self.start_task_thread(self.execute_restore_bak_dir_thread, d)
+        Button(self.right_content, text=lang["fix_restore_dir"], command=run_restore_bak_dir, bg="#16a085", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
     def execute_restore_bak_thread(self, bak_file_path):
         try:
@@ -541,24 +537,73 @@ class PythonDeveloperToolGUI:
             
             if not os.path.exists(bak_file_path):
                 self.log(f"[Error] Backup file does not exist: {bak_file_path}")
-                messagebox.showerror(lang["error"], "File backup không tồn tại!")
                 return
                 
             with open(bak_file_path, "r", encoding="utf-8", errors="ignore") as test_f:
                 content = test_f.read()
                 
             if not content.strip():
-                self.log("[Warning] Selected backup file is empty. Restoration aborted.")
+                self.log("[Warning] Selected backup file is empty.")
                 messagebox.showwarning(lang["warning"], "File backup trống rỗng, không thể khôi phục!")
                 return
                 
             shutil.copy2(bak_file_path, py_file_path)
-            self.log(f"[Success] Restored original script successfully -> {os.path.basename(py_file_path)}")
-            messagebox.showinfo(lang["success"], f"Đã khôi phục file thành công về trạng thái cũ:\n{os.path.basename(py_file_path)}")
+            self.log(f"[Success] Restored successfully -> {os.path.basename(py_file_path)}")
+            messagebox.showinfo(lang["success"], f"Đã khôi phục file thành công:\n{os.path.basename(py_file_path)}")
             
         except Exception as e:
             self.log(f"[Error] Restoration failed: {e}")
-            messagebox.showerror(LANGUAGES[self.current_lang]["error"], f"Lỗi khôi phục: {e}")
+        finally: self.end_task_status()
+
+    # THUẬT TOÁN QUÉT VÀ KHÔI PHỤC HÀNG LOẠT THEO THƯ MỤC CHỌN TRƯỚC
+    def execute_restore_bak_dir_thread(self, dir_path):
+        try:
+            lang = LANGUAGES[self.current_lang]
+            self.log(f"Starting mass restoration in directory: {dir_path}")
+            
+            ignored_dirs = {".venv", "venv", "env", "__pycache__", ".git"}
+            bak_files_found = []
+            
+            # Quét đệ quy tìm tất cả file .bak hoặc .py.bak
+            for r, dirs, files in os.walk(dir_path):
+                if self.is_aborted: return
+                dirs[:] = [d for d in dirs if d not in ignored_dirs]
+                for f in files:
+                    if f.endswith(".bak"):
+                        full_bak_path = os.path.abspath(os.path.join(r, f))
+                        bak_files_found.append(full_bak_path)
+            
+            if not bak_files_found:
+                self.log("[Notice] No backup (.bak) files found in the selected folder.")
+                messagebox.showinfo(lang["notice"], "Không tìm thấy file sao lưu đuôi .bak nào trong thư mục này.")
+                return
+
+            restored_count = 0
+            for bak_path in bak_files_found:
+                if self.is_aborted: return
+                
+                # Chuyển đổi tên file: nếu tên là script.py.bak -> phục hồi lại script.py
+                if bak_path.endswith(".bak"):
+                    target_py_path = bak_path[:-4]
+                else:
+                    continue
+                
+                try:
+                    # Kiểm tra xem file bak có rỗng không trước khi khôi phục
+                    if os.path.getsize(bak_path) > 0:
+                        shutil.copy2(bak_path, target_py_path)
+                        self.log(f"[Restored] {os.path.basename(bak_path)} -> {os.path.basename(target_py_path)}")
+                        restored_count += 1
+                    else:
+                        self.log(f"[Skipped] Empty file: {os.path.basename(bak_path)}")
+                except Exception as ex:
+                    self.log(f"[Fail] Could not restore {os.path.basename(bak_path)}: {ex}")
+            
+            self.log(f"[Finished] Mass rollback completed. Successfully restored {restored_count}/{len(bak_files_found)} files.")
+            messagebox.showinfo(lang["success"], f"Đã khôi phục hoàn tất toàn bộ thư mục!\nSố file khôi phục thành công: {restored_count}")
+        except Exception as e:
+            self.log(f"[Error] Mass folder restoration failed: {e}")
+            messagebox.showerror(lang["error"], f"Lỗi trong quá trình quét thư mục: {e}")
         finally:
             self.end_task_status()
 
@@ -599,7 +644,7 @@ class PythonDeveloperToolGUI:
             with open(py_file, "w", encoding="utf-8") as f: f.writelines(new_lines)
             self.log(f"Fixed & Backed up: {os.path.basename(py_file)}")
 
-    # ==================== CHỨC NĂNG 4: QUÉT & SỬA CODE TRỰC TIẾP ====================
+    # ==================== LIVE CODE FIXER ====================
     def show_paste_code_fixer(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -653,11 +698,10 @@ class PythonDeveloperToolGUI:
         if f:
             with open(f, "w", encoding="utf-8") as file: file.write(content)
 
-    # ==================== HYBRID DIAGNOSTIC ENGINE V2.2 (SỬA CODE LAI) ====================
+    # ==================== HYBRID DIAGNOSTIC ENGINE ====================
     def core_fix_algorithm_advanced(self, lines):
         fixed, raw_fixed = self.first_pass_fix(lines)
         raw_fixed = self.fix_indentation_via_tokens(raw_fixed)
-        
         attempts = 0
         max_attempts = 10
         
@@ -690,7 +734,6 @@ class PythonDeveloperToolGUI:
                     fixed = True
                 else:
                     break
-        
         return fixed, raw_fixed
 
     def fix_indentation_via_tokens(self, lines):
@@ -713,7 +756,6 @@ class PythonDeveloperToolGUI:
     def first_pass_fix(self, lines):
         fixed = False
         new_lines = []
-        
         for line in lines:
             stripped = line.strip()
             if not stripped:
@@ -781,7 +823,6 @@ class PythonDeveloperToolGUI:
                 fixed = True
 
             new_lines.append(line)
-            
         return fixed, new_lines
 
 if __name__ == "__main__":
