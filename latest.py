@@ -15,7 +15,7 @@ from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, E
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 
@@ -57,7 +57,7 @@ LANGUAGES = {
         "btn_about": "5. Thông tin phần mềm",
         "btn_abort": "🛑 DỪNG KHẨN CẤP",
         "console_log": "Nhật ký hoạt động (Console Log):",
-        "ready": "Hệ thống sẵn sàng. Đã tích hợp tính năng Khôi phục hàng loạt từ thư mục chứa file .bak.",
+        "ready": "Hệ thống sẵn sàng. Đã tối ưu hóa thuật toán check version bằng Tuple định dạng số.",
         "welcome": f"Chào mừng bạn đến với {APP_NAME}!\nHãy chọn một tính năng bên menu trái để bắt đầu.",
         "build_title": "ĐÓNG GÓI ỨNG DỤNG (PYTHON SANG EXE)",
         "select_script": "Chọn file script:",
@@ -104,7 +104,7 @@ LANGUAGES = {
         "btn_about": "5. About Software",
         "btn_abort": "🛑 EMERGENCY STOP",
         "console_log": "Activity Logs (Console Log):",
-        "ready": "System ready. Batch restoration from directory containing .bak files is now supported.",
+        "ready": "System ready. Upgraded numeric version check system logic.",
         "welcome": f"Welcome to {APP_NAME}!\nPlease select a feature from the left menu to start.",
         "build_title": "APPLICATION PACKAGING (PYTHON TO EXE)",
         "select_script": "Select script file:",
@@ -283,7 +283,7 @@ class PythonDeveloperToolGUI:
         lbl = Label(self.right_content, text=LANGUAGES[self.current_lang]["welcome"], font=("Segoe UI", 12), bg="white", fg="#555", pady=50)
         lbl.pack(fill=BOTH, expand=True)
 
-    # ==================== UPDATE SYSTEM ====================
+    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN (TUPLE INT COMPARISON) ====================
     def check_for_updates(self, is_manual=False):
         lang = LANGUAGES[self.current_lang]
         self.log(lang["checking_update"])
@@ -298,6 +298,7 @@ class PythonDeveloperToolGUI:
                 latest_version = match.group(1).strip()
                 self.log(f"[Update Checker] Local: {VERSION} | Live GitHub: {latest_version}")
                 
+                # SỬA LỖI TẠI ĐÂY: Dùng bộ so sánh Tuple số nguyên thay vì chuỗi
                 if self.is_newer_version(VERSION, latest_version):
                     self.log(f"New update found: {latest_version}")
                     self.root.after(100, lambda: self.ask_for_update(latest_version))
@@ -306,16 +307,22 @@ class PythonDeveloperToolGUI:
                     if is_manual:
                         self.root.after(100, lambda: messagebox.showinfo(lang["notice"], lang["up_to_date"]))
             else:
-                self.log("[Update Checker] No version found in README.")
-                if is_manual: messagebox.showwarning(lang["warning"], "Không tìm thấy thông tin trên GitHub.")
+                self.log("[Update Checker] Khong tim thay chuoi 'Latest version: X.X.X' trong file README trên GitHub.")
+                if is_manual: 
+                    messagebox.showwarning(lang["warning"], "Không tìm thấy cấu trúc thông tin phiên bản hợp lệ trên GitHub (Hãy kiểm tra lại file README.md).")
         except Exception as e:
-            self.log(f"[Update Checker] Failed: {e}")
-            if is_manual: messagebox.showerror(lang["error"], f"Lỗi kết nối: {e}")
+            self.log(f"[Update Checker] Lỗi kết nối: {e}")
+            if is_manual: messagebox.showerror(lang["error"], f"Lỗi kết nối máy chủ GitHub: {e}")
 
     def is_newer_version(self, current, latest):
-        c_parts = [int(x) for x in current.split(".")]
-        l_parts = [int(x) for x in latest.split(".")]
-        return l_parts > c_parts
+        try:
+            # Chuyển đổi định dạng "2.5.0" -> [2, 5, 0] để so sánh đại số chính xác
+            c_parts = [int(x) for x in current.split(".")]
+            l_parts = [int(x) for x in latest.split(".")]
+            return l_parts > c_parts
+        except Exception:
+            # Dự phòng nếu chuỗi không hợp lệ
+            return latest != current
 
     def ask_for_update(self, new_ver):
         lang = LANGUAGES[self.current_lang]
@@ -500,26 +507,22 @@ class PythonDeveloperToolGUI:
         Label(self.right_content, text=lang["fix_title"], font=("Segoe UI", 13, "bold"), bg="white", fg="#2c3e50").pack(anchor="w", pady=10)
         Label(self.right_content, text=lang["fix_desc"], font=("Segoe UI", 10), justify=LEFT, bg="white", fg="#666").pack(anchor="w", pady=5)
 
-        # 1. Sửa file đơn lẻ
         def run_single():
             f = filedialog.askopenfilename(filetypes=[("Python Files", "*.py")])
             if f and os.path.abspath(f) != os.path.abspath(sys.argv[0]):
                 self.start_task_thread(self.process_fix_file, f)
         Button(self.right_content, text=lang["fix_single"], command=run_single, bg="#d35400", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
-        # 2. Quét sửa toàn bộ thư mục
         def run_dir():
             d = filedialog.askdirectory()
             if d: self.start_task_thread(self.process_fix_dir_thread, d)
         Button(self.right_content, text=lang["fix_dir"], command=run_dir, bg="#c0392b", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
-        # 3. Khôi phục 1 file từ file .bak chọn lọc
         def run_restore_bak():
             bak_file = filedialog.askopenfilename(filetypes=[("Backup Files", "*.bak")])
             if bak_file: self.start_task_thread(self.execute_restore_bak_thread, bak_file)
         Button(self.right_content, text=lang["fix_restore"], command=run_restore_bak, bg="#2980b9", fg="white", font=("Segoe UI", 11, "bold"), bd=0, pady=12).pack(fill=X, pady=6)
 
-        # 4. TÍNH NĂNG MỚI: QUÉT VÀ KHÔI PHỤC HÀNG LOẠT THEO THƯ MỤC CHỨA FILE .BAK
         def run_restore_bak_dir():
             d = filedialog.askdirectory()
             if d: self.start_task_thread(self.execute_restore_bak_dir_thread, d)
@@ -555,7 +558,6 @@ class PythonDeveloperToolGUI:
             self.log(f"[Error] Restoration failed: {e}")
         finally: self.end_task_status()
 
-    # THUẬT TOÁN QUÉT VÀ KHÔI PHỤC HÀNG LOẠT THEO THƯ MỤC CHỌN TRƯỚC
     def execute_restore_bak_dir_thread(self, dir_path):
         try:
             lang = LANGUAGES[self.current_lang]
@@ -564,7 +566,6 @@ class PythonDeveloperToolGUI:
             ignored_dirs = {".venv", "venv", "env", "__pycache__", ".git"}
             bak_files_found = []
             
-            # Quét đệ quy tìm tất cả file .bak hoặc .py.bak
             for r, dirs, files in os.walk(dir_path):
                 if self.is_aborted: return
                 dirs[:] = [d for d in dirs if d not in ignored_dirs]
@@ -581,15 +582,12 @@ class PythonDeveloperToolGUI:
             restored_count = 0
             for bak_path in bak_files_found:
                 if self.is_aborted: return
-                
-                # Chuyển đổi tên file: nếu tên là script.py.bak -> phục hồi lại script.py
                 if bak_path.endswith(".bak"):
                     target_py_path = bak_path[:-4]
                 else:
                     continue
                 
                 try:
-                    # Kiểm tra xem file bak có rỗng không trước khi khôi phục
                     if os.path.getsize(bak_path) > 0:
                         shutil.copy2(bak_path, target_py_path)
                         self.log(f"[Restored] {os.path.basename(bak_path)} -> {os.path.basename(target_py_path)}")
@@ -604,8 +602,7 @@ class PythonDeveloperToolGUI:
         except Exception as e:
             self.log(f"[Error] Mass folder restoration failed: {e}")
             messagebox.showerror(lang["error"], f"Lỗi trong quá trình quét thư mục: {e}")
-        finally:
-            self.end_task_status()
+        finally: self.end_task_status()
 
     def process_fix_dir_thread(self, dir_path):
         try:
@@ -633,7 +630,6 @@ class PythonDeveloperToolGUI:
                 with open(py_file, "r", encoding=encoding) as f: lines = f.readlines(); break
             except: continue
         if not lines: return
-        
         try:
             shutil.copy2(py_file, py_file + ".bak")
         except:
