@@ -1,3 +1,3 @@
 # Python-developer-tools
 Very useful when your Python doesn't work.
-Latest version: 2.4.0
+Latest version: 2.5.0
