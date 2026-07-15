@@ -17,12 +17,12 @@ from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, E
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.6.0"
+VERSION = "2.5.2"  # Tăng phiên bản lên 2.5.2
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 
 # =====================================================================
-# CƠ CHẾ DỰ PHÒNG VÀ ROLLBACK
+# [MỚI] HỆ THỐNG DỰ PHÒNG VÀ ROLLBACK
 # =====================================================================
 SAFE_MODE_FILE = "safe_mode.json"
 BACKUP_DIR = "backups"
@@ -34,7 +34,7 @@ GITHUB_README_BASE = "https://raw.githubusercontent.com/letranthienphat/Python-d
 GITHUB_LATEST_CODE_BASE = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/latest.py"
 
 # =====================================================================
-# HỆ THỐNG DỰ PHÒNG (FALLBACK / SAFE MODE)
+# [MỚI] QUẢN LÝ CHẾ ĐỘ DỰ PHÒNG
 # =====================================================================
 
 class SafeModeManager:
@@ -168,26 +168,6 @@ class SafeModeManager:
         except:
             return False
 
-def check_and_handle_corruption():
-    """Kiểm tra và xử lý khi file bị hỏng"""
-    try:
-        # Kiểm tra file hiện tại có parse được không
-        current_file = os.path.abspath(sys.argv[0])
-        with open(current_file, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        try:
-            ast.parse(content)
-            # File hợp lệ, cập nhật trạng thái an toàn nếu cần
-            if not SafeModeManager.load_safe_state():
-                SafeModeManager.create_first_safe_state()
-            return True, None
-        except SyntaxError as e:
-            # File bị lỗi cú pháp, cần rollback
-            return False, str(e)
-    except Exception as e:
-        return False, str(e)
-
 # =====================================================================
 # TỰ ĐỘNG KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO CHÍNH NÓ (NẾU THIẾU)
 # =====================================================================
@@ -257,6 +237,7 @@ LANGUAGES = {
         "up_to_date": "Tuyệt vời! Bạn đang sử dụng phiên bản mới nhất trên GitHub!",
         "update_found": "Phát hiện phiên bản mới: {new_ver}!\nBạn có muốn tự động tải về và nâng cấp ngay lập tức không?",
         "updating": "Đang tiến hành tải bản cập nhật mới...",
+        # [MỚI] Thêm key cho chế độ dự phòng
         "safe_mode_title": "⚠️ PHẦN MỀM ĐANG Ở CHẾ ĐỘ DỰ PHÒNG",
         "safe_mode_desc": "Phát hiện lỗi nghiêm trọng trong file hiện tại!\n\nLỗi: {error}\n\nBạn có muốn rollback về phiên bản an toàn đã được lưu trước đó không?",
         "btn_rollback": "🔄 ROLLBACK VỀ PHIÊN BẢN CŨ",
@@ -311,6 +292,7 @@ LANGUAGES = {
         "up_to_date": "Great! You are running the latest version available on GitHub!",
         "update_found": "New update available: {new_ver}!\nWould you like to automatically download and upgrade now?",
         "updating": "Downloading update and applying changes automatically...",
+        # [MỚI] Thêm key cho chế độ dự phòng
         "safe_mode_title": "⚠️ SOFTWARE IN SAFE MODE",
         "safe_mode_desc": "Critical error detected in current file!\n\nError: {error}\n\nDo you want to rollback to the previously saved safe version?",
         "btn_rollback": "🔄 ROLLBACK TO PREVIOUS VERSION",
@@ -327,9 +309,10 @@ class PythonDeveloperToolGUI:
         self.current_lang = "vi"
         self.is_aborted = False
         self.current_thread = None
+        # [MỚI] Biến đánh dấu chế độ dự phòng
         self.safe_mode_active = False
         
-        # Kiểm tra và xử lý file bị hỏng trước khi khởi tạo UI
+        # [MỚI] Kiểm tra và xử lý file bị hỏng trước khi khởi tạo UI
         if not self.handle_corruption_check():
             # Nếu không thể xử lý, thoát
             sys.exit(1)
@@ -339,6 +322,7 @@ class PythonDeveloperToolGUI:
         
         threading.Thread(target=self.check_for_updates, args=(False,), daemon=True).start()
     
+    # [MỚI] Hàm kiểm tra và xử lý lỗi
     def handle_corruption_check(self):
         """Kiểm tra và xử lý khi file bị hỏng"""
         try:
@@ -375,6 +359,7 @@ class PythonDeveloperToolGUI:
             self.safe_mode_active = True
             return True
     
+    # [MỚI] Hàm khởi động lại ứng dụng
     def restart_application(self):
         """Khởi động lại ứng dụng"""
         try:
@@ -402,7 +387,7 @@ class PythonDeveloperToolGUI:
         self.title_frame = Frame(self.root, bg="#2c3e50")
         self.title_frame.pack(fill=X)
         
-        # Thêm indicator chế độ dự phòng
+        # [MỚI] Thêm indicator chế độ dự phòng
         if self.safe_mode_active:
             self.safe_indicator = Label(self.title_frame, text="⚠️ SAFE MODE", font=("Helvetica", 11, "bold"), fg="#ff6b6b", bg="#2c3e50", pady=10)
             self.safe_indicator.pack(side=LEFT, padx=15)
@@ -445,7 +430,7 @@ class PythonDeveloperToolGUI:
         self.btn5 = Button(self.left_menu, text="", command=self.show_about_software, **self.btn_style)
         self.btn5.pack(fill=X, pady=4)
         
-        # Nút Rollback trên menu
+        # [MỚI] Nút Rollback trên menu
         self.btn_rollback = Button(self.left_menu, text="🔄 Rollback", font=("Segoe UI", 10, "bold"), bg="#e67e22", fg="white", activebackground="#d35400", activeforeground="white", pady=8, bd=0, cursor="hand2", command=self.manual_rollback)
         self.btn_rollback.pack(fill=X, pady=4)
         
@@ -469,6 +454,7 @@ class PythonDeveloperToolGUI:
         scrollbar.pack(side=RIGHT, fill=Y)
         self.log_text.pack(fill=BOTH, expand=True)
         
+        # [MỚI] Log thông báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             self.log(LANGUAGES[self.current_lang]["safe_mode_active"])
 
@@ -494,7 +480,8 @@ class PythonDeveloperToolGUI:
         self.btn5.config(text=lang["btn_about"])
         self.btn_abort.config(text=lang["btn_abort"])
         self.lbl_log.config(text=lang["console_log"])
-        self.btn_rollback.config(text=lang["btn_rollback"] if "btn_rollback" in lang else "🔄 Rollback")
+        # [MỚI] Cập nhật text cho nút rollback
+        self.btn_rollback.config(text=lang.get("btn_rollback", "🔄 Rollback"))
         self.show_welcome()
 
     def log(self, message):
@@ -524,6 +511,7 @@ class PythonDeveloperToolGUI:
         lbl = Label(self.right_content, text=LANGUAGES[self.current_lang]["welcome"], font=("Segoe UI", 12), bg="white", fg="#555", pady=50)
         lbl.pack(fill=BOTH, expand=True)
 
+    # [MỚI] Hàm rollback thủ công
     def manual_rollback(self):
         """Thực hiện rollback thủ công từ menu"""
         lang = LANGUAGES[self.current_lang]
@@ -605,7 +593,7 @@ class PythonDeveloperToolGUI:
                 
             current_file_path = os.path.abspath(sys.argv[0])
             
-            # Lưu trạng thái an toàn trước khi update
+            # [SỬA] Lưu trạng thái an toàn trước khi update
             with open(current_file_path, "rb") as f:
                 content = f.read()
                 file_hash = hashlib.sha256(content).hexdigest()
@@ -632,7 +620,7 @@ class PythonDeveloperToolGUI:
         lbl_title = Label(self.right_content, text=lang["about_title"], font=("Segoe UI", 13, "bold"), bg="white", fg="#2c3e50")
         lbl_title.pack(anchor="w", pady=10)
         
-        # Thêm thông tin về chế độ dự phòng
+        # [MỚI] Thêm thông tin về chế độ dự phòng
         status_text = ""
         if self.safe_mode_active:
             status_text = "\n⚠️ CHẾ ĐỘ DỰ PHÒNG ĐANG HOẠT ĐỘNG"
@@ -647,7 +635,7 @@ class PythonDeveloperToolGUI:
         Label(info_frame, text=f"Local Version: {VERSION}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
         Label(info_frame, text=f"Author Email: {AUTHOR_EMAIL}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
         
-        # Hiển thị thông tin backup
+        # [MỚI] Hiển thị thông tin backup
         state = SafeModeManager.load_safe_state()
         if state:
             backup_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(state.get("timestamp", 0)))
@@ -659,7 +647,7 @@ class PythonDeveloperToolGUI:
         btn_update = Button(self.right_content, text=lang["btn_manual_update"], font=("Segoe UI", 11, "bold"), bg="#2980b9", fg="white", bd=0, pady=12, command=trigger_manual_update_check)
         btn_update.pack(fill=X, pady=15)
         
-        # Thêm nút Rollback ở đây
+        # [MỚI] Thêm nút Rollback ở đây
         btn_rollback_about = Button(self.right_content, text="🔄 Rollback về bản an toàn", font=("Segoe UI", 11, "bold"), bg="#e67e22", fg="white", bd=0, pady=12, command=self.manual_rollback)
         btn_rollback_about.pack(fill=X, pady=5)
 
@@ -668,6 +656,7 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
+        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -734,6 +723,7 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
+        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -799,6 +789,7 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
+        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -944,6 +935,7 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
+        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
