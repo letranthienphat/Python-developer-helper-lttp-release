@@ -15,6 +15,7 @@ import importlib
 import pkgutil
 import inspect
 import builtins
+import random
 from io import BytesIO
 from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, END, Scrollbar, Y, Frame, messagebox, filedialog, ttk
 from collections import Counter
@@ -23,7 +24,7 @@ from difflib import SequenceMatcher
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.6.0"
+VERSION = "2.6.1"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 
@@ -33,8 +34,51 @@ AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 SAFE_MODE_FILE = "safe_mode.json"
 BACKUP_DIR = "backups"
 
+# =====================================================================
+# [NÂNG CẤP] CƠ CHẾ FORCE FETCH TỪ GITHUB
+# =====================================================================
+
 def get_anti_cache_url(base_url):
-    return f"{base_url}?t={int(time.time())}"
+    """Tạo URL với nhiều tham số cache-busting để buộc GitHub trả về file mới nhất"""
+    # Kết hợp timestamp + random number để đảm bảo unique
+    cache_buster = f"{int(time.time())}_{random.randint(1000, 9999)}_{hashlib.md5(str(time.time()).encode()).hexdigest()[:8]}"
+    return f"{base_url}?t={cache_buster}"
+
+def force_fetch_url(url, max_retries=3, timeout=10):
+    """Force fetch URL với nhiều lần thử và cache-busting mạnh"""
+    for attempt in range(max_retries):
+        try:
+            # Mỗi lần thử dùng cache-buster khác nhau
+            cache_url = get_anti_cache_url(url)
+            
+            # Thêm headers để giả lập trình duyệt và tránh cache
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Accept': 'text/plain,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+            }
+            
+            req = urllib.request.Request(cache_url, headers=headers)
+            
+            # Thêm random delay để tránh rate limit
+            time.sleep(random.uniform(0.3, 1.0))
+            
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                content = response.read().decode('utf-8')
+                
+                # Kiểm tra nếu nội dung hợp lệ
+                if content and len(content.strip()) > 0:
+                    return content, True
+                    
+        except Exception as e:
+            print(f"[ForceFetch] Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                # Tăng thời gian chờ giữa các lần thử
+                time.sleep(2 ** attempt)  # Exponential backoff
+    
+    return None, False
 
 GITHUB_README_BASE = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/README.md"
 GITHUB_LATEST_CODE_BASE = "https://raw.githubusercontent.com/letranthienphat/Python-developer-helper-lttp-release/refs/heads/main/latest.py"
@@ -177,11 +221,9 @@ class LibraryManager:
         except:
             pass
         
-        # Thêm các module built-in
         builtin_modules = dir(builtins)
         libraries.extend([m for m in builtin_modules if not m.startswith('_')])
         
-        # Lọc và loại bỏ trùng lặp
         libraries = list(set(libraries))
         return sorted(libraries)
     
@@ -202,7 +244,6 @@ class LibraryManager:
             info["version"] = getattr(module, "__version__", "Unknown")
             info["description"] = getattr(module, "__doc__", "No description")
             
-            # Lấy danh sách functions
             for name, obj in inspect.getmembers(module):
                 if inspect.isfunction(obj):
                     info["functions"].append(name)
@@ -275,7 +316,6 @@ class MultiStageOptimizer:
         """Tối ưu code qua nhiều lần và chọn kết quả tốt nhất"""
         results = []
         
-        # Tầng 1: Fix cú pháp cơ bản
         for attempt in range(max_attempts):
             try:
                 fixed = MultiStageOptimizer.basic_fix(code)
@@ -285,7 +325,6 @@ class MultiStageOptimizer:
             except:
                 pass
         
-        # Tầng 2: Fix nâng cao với token analysis
         for attempt in range(max_attempts):
             try:
                 fixed = MultiStageOptimizer.advanced_fix(code)
@@ -296,7 +335,6 @@ class MultiStageOptimizer:
             except:
                 pass
         
-        # Tầng 3: Tối ưu hóa cấu trúc
         for attempt in range(max_attempts):
             try:
                 fixed = MultiStageOptimizer.structure_optimize(code)
@@ -307,7 +345,6 @@ class MultiStageOptimizer:
             except:
                 pass
         
-        # Tầng 4: Tối ưu hóa performance
         for attempt in range(max_attempts):
             try:
                 fixed = MultiStageOptimizer.performance_optimize(code)
@@ -318,7 +355,6 @@ class MultiStageOptimizer:
             except:
                 pass
         
-        # Tầng 5: Kết hợp các kỹ thuật
         for attempt in range(max_attempts):
             try:
                 fixed = MultiStageOptimizer.combined_optimize(code)
@@ -329,11 +365,9 @@ class MultiStageOptimizer:
             except:
                 pass
         
-        # Nếu không có kết quả nào, trả về code gốc
         if not results:
             return code
         
-        # Chọn kết quả tốt nhất (điểm cao nhất)
         best = max(results, key=lambda x: x["score"])
         return best["code"]
     
@@ -349,18 +383,15 @@ class MultiStageOptimizer:
                 fixed_lines.append(line)
                 continue
             
-            # Fix missing colon
             if stripped.startswith(("if ", "elif ", "else", "for ", "while ", "def ", "class ", "try", "except")):
                 if not stripped.endswith(":") and not stripped.endswith("\\"):
                     line = line.rstrip("\r\n") + ":\n"
             
-            # Fix print statement
             if stripped.startswith("print ") and not stripped.startswith("print("):
                 content = stripped[6:].strip()
                 indent = line[:len(line) - len(line.lstrip())]
                 line = f'{indent}print({content})\n'
             
-            # Fix except syntax
             if stripped.startswith("except ") and "," in stripped and " as " not in stripped:
                 match = re.search(r"except\s+([^,]+)\s*,\s*([^:]+):", stripped)
                 if match:
@@ -397,7 +428,6 @@ class MultiStageOptimizer:
         """Tối ưu cấu trúc code"""
         lines = code.splitlines()
         
-        # Loại bỏ comment thừa
         filtered_lines = []
         for line in lines:
             stripped = line.strip()
@@ -408,7 +438,6 @@ class MultiStageOptimizer:
             else:
                 filtered_lines.append(line)
         
-        # Tối ưu import
         imports = []
         code_lines = []
         for line in filtered_lines:
@@ -418,7 +447,6 @@ class MultiStageOptimizer:
             else:
                 code_lines.append(line)
         
-        # Nhóm import theo thứ tự
         sorted_imports = sorted(imports, key=lambda x: (x.startswith("from "), x))
         
         return "\n".join(sorted_imports + code_lines)
@@ -426,14 +454,12 @@ class MultiStageOptimizer:
     @staticmethod
     def performance_optimize(code):
         """Tối ưu hiệu suất"""
-        # Thay thế vòng lặp chậm bằng list comprehension
         code = re.sub(
             r'for\s+(\w+)\s+in\s+range\(len\(([^)]+)\)\):\s*\n\s*([^\n]+)\[(\w+)\]',
             r'[\3(\4) for \4 in range(len(\2))]',
             code
         )
         
-        # Tối ưu string concatenation
         code = re.sub(
             r'(["\'])([^\1]*?)\1\s*\+\s*(["\'])([^\3]*?)\3',
             r'"\2\4"',
@@ -468,26 +494,20 @@ class MultiStageOptimizer:
         try:
             tree = ast.parse(code)
             
-            # Điểm cho code hợp lệ
             score += 50
             
-            # Điểm cho docstring
             if ast.get_docstring(tree):
                 score += 10
             
-            # Điểm cho số lượng hàm
             functions = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
             score += min(len(functions) * 2, 20)
             
-            # Điểm cho số lượng class
             classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
             score += min(len(classes) * 3, 15)
             
-            # Điểm cho import có tổ chức
             imports = [node for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))]
             score += min(len(imports), 5)
             
-            # Điểm cho code ngắn gọn
             lines = len(code.splitlines())
             if lines < 50:
                 score += 10
@@ -537,7 +557,6 @@ class CodeAnalyzer:
         try:
             tree = ast.parse(code)
             
-            # Đếm functions và classes
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     stats["functions"] += 1
@@ -546,10 +565,8 @@ class CodeAnalyzer:
                 elif isinstance(node, (ast.Import, ast.ImportFrom)):
                     stats["imports"] += 1
             
-            # Tính độ phức tạp (số lượng nodes trong AST)
             stats["complexity"] = sum(1 for _ in ast.walk(tree))
             
-            # Phát hiện issues
             for node in ast.walk(tree):
                 if isinstance(node, ast.Try):
                     if not node.handlers and not node.finalbody:
@@ -713,7 +730,6 @@ class PythonDeveloperToolGUI:
         self.current_thread = None
         self.safe_mode_active = False
         
-        # [MỚI] Kiểm tra và xử lý file bị hỏng trước khi khởi tạo UI
         if not self.handle_corruption_check():
             sys.exit(1)
         
@@ -722,7 +738,6 @@ class PythonDeveloperToolGUI:
         
         threading.Thread(target=self.check_for_updates, args=(False,), daemon=True).start()
     
-    # [MỚI] Hàm kiểm tra và xử lý lỗi
     def handle_corruption_check(self):
         try:
             SafeModeManager.create_first_safe_state()
@@ -918,17 +933,24 @@ class PythonDeveloperToolGUI:
             else:
                 messagebox.showerror(lang["error"], f"Rollback thất bại: {result}")
 
-    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN ====================
+    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN (NÂNG CẤP) ====================
     def check_for_updates(self, is_manual=False):
+        """Kiểm tra cập nhật với cơ chế force fetch mới"""
         lang = LANGUAGES[self.current_lang]
         self.log(lang["checking_update"])
+        
         try:
-            anti_cache_url = get_anti_cache_url(GITHUB_README_BASE)
-            req = urllib.request.Request(anti_cache_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=7) as response:
-                html = response.read().decode('utf-8')
-                
-            match = re.search(r"Latest version:\s*([\d\.]+)", html, re.IGNORECASE)
+            # Sử dụng force_fetch_url để lấy nội dung README
+            content, success = force_fetch_url(GITHUB_README_BASE, max_retries=5, timeout=15)
+            
+            if not success or not content:
+                self.log("[Update Checker] Không thể kết nối đến GitHub sau nhiều lần thử.")
+                if is_manual:
+                    messagebox.showerror(lang["error"], "Không thể kết nối đến GitHub. Vui lòng kiểm tra kết nối internet.")
+                return
+            
+            # Tìm phiên bản mới nhất trong README
+            match = re.search(r"Latest version:\s*([\d\.]+)", content, re.IGNORECASE)
             if match:
                 latest_version = match.group(1).strip()
                 self.log(f"[Update Checker] Local: {VERSION} | Live GitHub: {latest_version}")
@@ -941,12 +963,14 @@ class PythonDeveloperToolGUI:
                     if is_manual:
                         self.root.after(100, lambda: messagebox.showinfo(lang["notice"], lang["up_to_date"]))
             else:
-                self.log("[Update Checker] Khong tim thay chuoi 'Latest version: X.X.X' trong file README trên GitHub.")
-                if is_manual: 
+                self.log("[Update Checker] Không tìm thấy chuỗi 'Latest version: X.X.X' trong file README trên GitHub.")
+                if is_manual:
                     messagebox.showwarning(lang["warning"], "Không tìm thấy cấu trúc thông tin phiên bản hợp lệ trên GitHub.")
+                    
         except Exception as e:
-            self.log(f"[Update Checker] Lỗi kết nối: {e}")
-            if is_manual: messagebox.showerror(lang["error"], f"Lỗi kết nối máy chủ GitHub: {e}")
+            self.log(f"[Update Checker] Lỗi: {e}")
+            if is_manual:
+                messagebox.showerror(lang["error"], f"Lỗi kiểm tra cập nhật: {e}")
 
     def is_newer_version(self, current, latest):
         try:
@@ -964,28 +988,46 @@ class PythonDeveloperToolGUI:
             threading.Thread(target=self.apply_update, daemon=True).start()
 
     def apply_update(self):
+        """Áp dụng cập nhật với force fetch mạnh mẽ hơn"""
         try:
-            anti_cache_code_url = get_anti_cache_url(GITHUB_LATEST_CODE_BASE)
-            req = urllib.request.Request(anti_cache_code_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=12) as response:
-                new_code = response.read().decode('utf-8')
+            self.log("Đang tải bản cập nhật mới nhất...")
+            
+            # Sử dụng force_fetch_url để lấy code mới nhất
+            new_code, success = force_fetch_url(GITHUB_LATEST_CODE_BASE, max_retries=5, timeout=20)
+            
+            if not success or not new_code:
+                self.log("[Update Error] Không thể tải code mới từ GitHub.")
+                messagebox.showerror("Update Error", "Không thể tải bản cập nhật. Vui lòng thử lại sau.")
+                return
+            
+            # Kiểm tra code hợp lệ
+            try:
+                ast.parse(new_code)
+            except SyntaxError as e:
+                self.log(f"[Update Error] Code mới bị lỗi cú pháp: {e}")
+                messagebox.showerror("Update Error", f"Code mới bị lỗi cú pháp: {e}")
+                return
                 
             current_file_path = os.path.abspath(sys.argv[0])
             
+            # Lưu trạng thái an toàn trước khi update
             with open(current_file_path, "rb") as f:
                 content = f.read()
                 file_hash = hashlib.sha256(content).hexdigest()
             SafeModeManager.save_safe_state(VERSION, file_hash)
             
+            # Backup file hiện tại
             shutil.copy2(current_file_path, current_file_path + ".bak")
             
+            # Ghi code mới
             with open(current_file_path, "w", encoding="utf-8") as f:
                 f.write(new_code)
                 
-            self.log("[Update] Done! Exiting application...")
-            messagebox.showinfo("Update Done", "Cập nhật thành công! Hãy mở lại chương trình.")
+            self.log("[Update] Cập nhật thành công! Đang khởi động lại...")
+            messagebox.showinfo("Update Done", "Cập nhật thành công! Phần mềm sẽ tự động khởi động lại.")
             self.root.quit()
             sys.exit(0)
+            
         except Exception as e:
             self.log(f"[Update Error] failed: {e}")
             messagebox.showerror("Update Error", f"Cập nhật thất bại: {e}")
@@ -1302,7 +1344,7 @@ class PythonDeveloperToolGUI:
             with open(py_file, "w", encoding="utf-8") as f: f.writelines(new_lines)
             self.log(f"Fixed & Backed up: {os.path.basename(py_file)}")
 
-    # ==================== LIVE CODE FIXER (NÂNG CẤP) ====================
+    # ==================== LIVE CODE FIXER ====================
     def show_paste_code_fixer(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
@@ -1335,7 +1377,6 @@ class PythonDeveloperToolGUI:
         self.txt_output_code = Text(right_panel, font=("Consolas", 10), bg="#2d2d2d", fg="#f8f8f2", bd=1, relief="solid")
         self.txt_output_code.pack(fill=BOTH, expand=True)
         
-        # [MỚI] Toolbar cho các chức năng nâng cao
         action_frame = Frame(self.right_content, bg="white")
         action_frame.pack(fill=X, pady=5)
         
@@ -1344,7 +1385,6 @@ class PythonDeveloperToolGUI:
         Button(action_frame, text=lang["btn_install_missing"], font=("Segoe UI", 11, "bold"), bg="#e67e22", fg="white", bd=0, pady=10, command=self.install_missing_libs).pack(side=LEFT, expand=True, fill=X, padx=2)
 
     def action_fix_pasted_code(self):
-        """Fix code với nhiều lần thử và chọn kết quả tốt nhất"""
         raw_code = self.txt_input_code.get("1.0", END)
         if not raw_code.strip(): 
             messagebox.showwarning("Cảnh báo", "Vui lòng nhập code cần sửa!")
@@ -1352,15 +1392,11 @@ class PythonDeveloperToolGUI:
         
         self.log("Bắt đầu quá trình fix code đa tầng...")
         
-        # Sử dụng MultiStageOptimizer để fix code
         try:
             optimized = MultiStageOptimizer.optimize_code(raw_code, max_attempts=10)
             
-            # So sánh kết quả với code gốc
             if optimized != raw_code:
                 self.log("Code đã được tối ưu thành công!")
-                
-                # Phân tích code sau khi fix
                 stats = CodeAnalyzer.analyze_code(optimized)
                 self.log(f"Đã fix: {stats['issues'] if stats['issues'] else 'Không phát hiện lỗi'}")
                 
@@ -1376,7 +1412,6 @@ class PythonDeveloperToolGUI:
             messagebox.showerror("Lỗi", f"Không thể fix code: {e}")
     
     def analyze_pasted_code(self):
-        """Phân tích chi tiết code"""
         code = self.txt_input_code.get("1.0", END)
         if not code.strip():
             messagebox.showwarning("Cảnh báo", "Vui lòng nhập code cần phân tích!")
@@ -1387,7 +1422,6 @@ class PythonDeveloperToolGUI:
         try:
             stats = CodeAnalyzer.analyze_code(code)
             
-            # Tạo báo cáo chi tiết
             report = f"""
 📊 PHÂN TÍCH CODE CHI TIẾT
 {'='*50}
@@ -1417,12 +1451,10 @@ class PythonDeveloperToolGUI:
 {chr(10).join(['- ' + lib for lib in LibraryManager.detect_missing_libraries(code)]) if LibraryManager.detect_missing_libraries(code) else '✅ Tất cả thư viện đã được cài đặt'}
 """
             
-            # Hiển thị báo cáo trong output
             self.txt_output_code.delete("1.0", END)
             self.txt_output_code.insert("1.0", report)
             self.log("Phân tích code hoàn tất!")
             
-            # Hiện thông báo tóm tắt
             messagebox.showinfo(
                 "Phân tích hoàn tất",
                 f"Tìm thấy {len(stats['issues'])} vấn đề và {len(stats['suggestions'])} gợi ý cải thiện."
@@ -1433,7 +1465,6 @@ class PythonDeveloperToolGUI:
             messagebox.showerror("Lỗi", f"Không thể phân tích code: {e}")
     
     def install_missing_libs(self):
-        """Tự động cài đặt thư viện thiếu"""
         code = self.txt_input_code.get("1.0", END)
         if not code.strip():
             messagebox.showwarning("Cảnh báo", "Vui lòng nhập code để kiểm tra thư viện!")
