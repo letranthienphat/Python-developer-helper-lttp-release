@@ -11,13 +11,19 @@ import time
 import urllib.request
 import json
 import hashlib
+import importlib
+import pkgutil
+import inspect
+import builtins
 from io import BytesIO
 from tkinter import Button, Label, Entry, Text, Tk, TOP, X, BOTH, LEFT, RIGHT, END, Scrollbar, Y, Frame, messagebox, filedialog, ttk
+from collections import Counter
+from difflib import SequenceMatcher
 
 # =====================================================================
 # THÔNG TIN PHIÊN BẢN TOÀN CỤC (GLOBAL VERSION CONTROL)
 # =====================================================================
-VERSION = "2.5.2"  # Tăng phiên bản lên 2.5.2
+VERSION = "2.6.0"
 APP_NAME = "Python developer helper lttp release"
 AUTHOR_EMAIL = "tranthienphatle@gmail.com"
 
@@ -42,17 +48,14 @@ class SafeModeManager:
     
     @staticmethod
     def get_safe_mode_path():
-        """Lấy đường dẫn file lưu trạng thái an toàn"""
         return os.path.join(os.path.dirname(sys.argv[0]), SAFE_MODE_FILE)
     
     @staticmethod
     def get_backup_dir():
-        """Lấy đường dẫn thư mục backup"""
         return os.path.join(os.path.dirname(sys.argv[0]), BACKUP_DIR)
     
     @staticmethod
     def save_safe_state(version, file_hash, timestamp=None):
-        """Lưu trạng thái an toàn hiện tại"""
         if timestamp is None:
             timestamp = time.time()
         
@@ -63,7 +66,6 @@ class SafeModeManager:
             "backup_file": None
         }
         
-        # Tạo backup của file hiện tại
         backup_dir = SafeModeManager.get_backup_dir()
         os.makedirs(backup_dir, exist_ok=True)
         
@@ -76,7 +78,6 @@ class SafeModeManager:
         except Exception as e:
             print(f"[SafeMode] Không thể tạo backup: {e}")
         
-        # Lưu trạng thái
         try:
             with open(SafeModeManager.get_safe_mode_path(), "w", encoding="utf-8") as f:
                 json.dump(state, f, indent=2)
@@ -87,7 +88,6 @@ class SafeModeManager:
     
     @staticmethod
     def load_safe_state():
-        """Đọc trạng thái an toàn đã lưu"""
         try:
             with open(SafeModeManager.get_safe_mode_path(), "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -96,7 +96,6 @@ class SafeModeManager:
     
     @staticmethod
     def check_file_integrity():
-        """Kiểm tra tính toàn vẹn của file hiện tại"""
         current_file = os.path.abspath(sys.argv[0])
         try:
             with open(current_file, "rb") as f:
@@ -112,7 +111,6 @@ class SafeModeManager:
     
     @staticmethod
     def rollback_to_safe_version():
-        """Rollback về phiên bản an toàn đã lưu"""
         state = SafeModeManager.load_safe_state()
         if not state or not state.get("backup_file"):
             return False, "Không tìm thấy bản backup hợp lệ"
@@ -123,24 +121,19 @@ class SafeModeManager:
         
         current_file = os.path.abspath(sys.argv[0])
         try:
-            # Đọc nội dung backup
             with open(backup_file, "r", encoding="utf-8") as f:
                 backup_content = f.read()
             
-            # Kiểm tra tính hợp lệ
             try:
                 ast.parse(backup_content)
             except SyntaxError as e:
                 return False, f"File backup bị lỗi cú pháp: {e}"
             
-            # Sao lưu file hiện tại trước khi rollback
             shutil.copy2(current_file, current_file + ".pre_rollback.bak")
             
-            # Rollback
             with open(current_file, "w", encoding="utf-8") as f:
                 f.write(backup_content)
             
-            # Cập nhật hash mới
             new_hash = hashlib.sha256(backup_content.encode()).hexdigest()
             state["file_hash"] = new_hash
             state["timestamp"] = time.time()
@@ -154,7 +147,6 @@ class SafeModeManager:
 
     @staticmethod
     def create_first_safe_state():
-        """Tạo trạng thái an toàn đầu tiên khi chạy lần đầu"""
         state = SafeModeManager.load_safe_state()
         if state:
             return True
@@ -167,6 +159,414 @@ class SafeModeManager:
             return SafeModeManager.save_safe_state(VERSION, file_hash)
         except:
             return False
+
+# =====================================================================
+# [MỚI] HỆ THỐNG QUẢN LÝ THƯ VIỆN TOÀN DIỆN
+# =====================================================================
+
+class LibraryManager:
+    """Quản lý và tích hợp toàn bộ thư viện Python"""
+    
+    @staticmethod
+    def get_all_installed_libraries():
+        """Lấy danh sách tất cả thư viện đã cài đặt"""
+        libraries = []
+        try:
+            for module in pkgutil.iter_modules():
+                libraries.append(module.name)
+        except:
+            pass
+        
+        # Thêm các module built-in
+        builtin_modules = dir(builtins)
+        libraries.extend([m for m in builtin_modules if not m.startswith('_')])
+        
+        # Lọc và loại bỏ trùng lặp
+        libraries = list(set(libraries))
+        return sorted(libraries)
+    
+    @staticmethod
+    def get_library_info(lib_name):
+        """Lấy thông tin chi tiết về thư viện"""
+        info = {
+            "name": lib_name,
+            "version": "Unknown",
+            "description": "No description",
+            "functions": [],
+            "classes": [],
+            "modules": []
+        }
+        
+        try:
+            module = importlib.import_module(lib_name)
+            info["version"] = getattr(module, "__version__", "Unknown")
+            info["description"] = getattr(module, "__doc__", "No description")
+            
+            # Lấy danh sách functions
+            for name, obj in inspect.getmembers(module):
+                if inspect.isfunction(obj):
+                    info["functions"].append(name)
+                elif inspect.isclass(obj):
+                    info["classes"].append(name)
+        except:
+            pass
+        
+        return info
+    
+    @staticmethod
+    def scan_imports(code):
+        """Quét tất cả import trong code"""
+        imports = set()
+        pattern = r'^\s*(?:from\s+([\w.]+)\s+import|import\s+([\w\s,]+))'
+        for line in code.split('\n'):
+            match = re.match(pattern, line)
+            if match:
+                if match.group(1):
+                    imports.add(match.group(1).split('.')[0])
+                elif match.group(2):
+                    for imp in match.group(2).split(','):
+                        imports.add(imp.strip().split('.')[0])
+        return sorted(imports)
+    
+    @staticmethod
+    def detect_missing_libraries(code):
+        """Phát hiện thư viện thiếu trong code"""
+        imports = LibraryManager.scan_imports(code)
+        installed = LibraryManager.get_all_installed_libraries()
+        missing = [imp for imp in imports if imp not in installed and imp not in sys.builtin_module_names]
+        return missing
+    
+    @staticmethod
+    def auto_install_missing_libraries(code, callback=None):
+        """Tự động cài đặt thư viện thiếu"""
+        missing = LibraryManager.detect_missing_libraries(code)
+        if not missing:
+            return {"success": True, "message": "Không có thư viện thiếu", "installed": []}
+        
+        installed = []
+        failed = []
+        
+        for lib in missing:
+            try:
+                if callback:
+                    callback(f"Đang cài đặt: {lib}...")
+                subprocess.run([sys.executable, "-m", "pip", "install", lib], 
+                             capture_output=True, check=True, timeout=30)
+                installed.append(lib)
+            except:
+                failed.append(lib)
+        
+        return {
+            "success": len(failed) == 0,
+            "installed": installed,
+            "failed": failed,
+            "message": f"Đã cài {len(installed)}/{len(missing)} thư viện"
+        }
+
+# =====================================================================
+# [MỚI] HỆ THỐNG TỐI ƯU HÓA CODE ĐA TẦNG
+# =====================================================================
+
+class MultiStageOptimizer:
+    """Tối ưu hóa code qua nhiều tầng và chọn kết quả tốt nhất"""
+    
+    @staticmethod
+    def optimize_code(code, max_attempts=10):
+        """Tối ưu code qua nhiều lần và chọn kết quả tốt nhất"""
+        results = []
+        
+        # Tầng 1: Fix cú pháp cơ bản
+        for attempt in range(max_attempts):
+            try:
+                fixed = MultiStageOptimizer.basic_fix(code)
+                if MultiStageOptimizer.validate_code(fixed):
+                    results.append({"code": fixed, "score": 100 - attempt * 5})
+                    break
+            except:
+                pass
+        
+        # Tầng 2: Fix nâng cao với token analysis
+        for attempt in range(max_attempts):
+            try:
+                fixed = MultiStageOptimizer.advanced_fix(code)
+                if MultiStageOptimizer.validate_code(fixed):
+                    score = MultiStageOptimizer.score_code(fixed)
+                    results.append({"code": fixed, "score": score})
+                    break
+            except:
+                pass
+        
+        # Tầng 3: Tối ưu hóa cấu trúc
+        for attempt in range(max_attempts):
+            try:
+                fixed = MultiStageOptimizer.structure_optimize(code)
+                if MultiStageOptimizer.validate_code(fixed):
+                    score = MultiStageOptimizer.score_code(fixed)
+                    results.append({"code": fixed, "score": score})
+                    break
+            except:
+                pass
+        
+        # Tầng 4: Tối ưu hóa performance
+        for attempt in range(max_attempts):
+            try:
+                fixed = MultiStageOptimizer.performance_optimize(code)
+                if MultiStageOptimizer.validate_code(fixed):
+                    score = MultiStageOptimizer.score_code(fixed)
+                    results.append({"code": fixed, "score": score})
+                    break
+            except:
+                pass
+        
+        # Tầng 5: Kết hợp các kỹ thuật
+        for attempt in range(max_attempts):
+            try:
+                fixed = MultiStageOptimizer.combined_optimize(code)
+                if MultiStageOptimizer.validate_code(fixed):
+                    score = MultiStageOptimizer.score_code(fixed)
+                    results.append({"code": fixed, "score": score})
+                    break
+            except:
+                pass
+        
+        # Nếu không có kết quả nào, trả về code gốc
+        if not results:
+            return code
+        
+        # Chọn kết quả tốt nhất (điểm cao nhất)
+        best = max(results, key=lambda x: x["score"])
+        return best["code"]
+    
+    @staticmethod
+    def basic_fix(code):
+        """Fix cú pháp cơ bản"""
+        lines = code.splitlines(keepends=True)
+        fixed_lines = []
+        
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                fixed_lines.append(line)
+                continue
+            
+            # Fix missing colon
+            if stripped.startswith(("if ", "elif ", "else", "for ", "while ", "def ", "class ", "try", "except")):
+                if not stripped.endswith(":") and not stripped.endswith("\\"):
+                    line = line.rstrip("\r\n") + ":\n"
+            
+            # Fix print statement
+            if stripped.startswith("print ") and not stripped.startswith("print("):
+                content = stripped[6:].strip()
+                indent = line[:len(line) - len(line.lstrip())]
+                line = f'{indent}print({content})\n'
+            
+            # Fix except syntax
+            if stripped.startswith("except ") and "," in stripped and " as " not in stripped:
+                match = re.search(r"except\s+([^,]+)\s*,\s*([^:]+):", stripped)
+                if match:
+                    err_type, err_var = match.group(1).strip(), match.group(2).strip()
+                    indent = line[:len(line) - len(line.lstrip())]
+                    line = f'{indent}except {err_type} as {err_var}:\n'
+            
+            fixed_lines.append(line)
+        
+        return "".join(fixed_lines)
+    
+    @staticmethod
+    def advanced_fix(code):
+        """Fix nâng cao sử dụng token analysis"""
+        try:
+            code_bytes = code.encode('utf-8')
+            tokens = list(tokenize.tokenize(BytesIO(code_bytes).readline))
+        except:
+            return MultiStageOptimizer.basic_fix(code)
+        
+        fixed_lines = code.splitlines(keepends=True)
+        for tok in tokens:
+            if tok.type == token.NAME and tok.string in ("def", "class", "if", "for", "while", "with", "try"):
+                line_idx = tok.start[0] - 1
+                if line_idx < len(fixed_lines):
+                    current_line = fixed_lines[line_idx]
+                    if current_line.strip() and not current_line.strip().endswith(":") and not current_line.strip().endswith("\\"):
+                        fixed_lines[line_idx] = current_line.rstrip("\r\n") + ":\n"
+        
+        return "".join(fixed_lines)
+    
+    @staticmethod
+    def structure_optimize(code):
+        """Tối ưu cấu trúc code"""
+        lines = code.splitlines()
+        
+        # Loại bỏ comment thừa
+        filtered_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                filtered_lines.append(line)
+            elif stripped.startswith("#") and "important" in stripped.lower():
+                filtered_lines.append(line)
+            else:
+                filtered_lines.append(line)
+        
+        # Tối ưu import
+        imports = []
+        code_lines = []
+        for line in filtered_lines:
+            stripped = line.strip()
+            if stripped.startswith(("import ", "from ")):
+                imports.append(line)
+            else:
+                code_lines.append(line)
+        
+        # Nhóm import theo thứ tự
+        sorted_imports = sorted(imports, key=lambda x: (x.startswith("from "), x))
+        
+        return "\n".join(sorted_imports + code_lines)
+    
+    @staticmethod
+    def performance_optimize(code):
+        """Tối ưu hiệu suất"""
+        # Thay thế vòng lặp chậm bằng list comprehension
+        code = re.sub(
+            r'for\s+(\w+)\s+in\s+range\(len\(([^)]+)\)\):\s*\n\s*([^\n]+)\[(\w+)\]',
+            r'[\3(\4) for \4 in range(len(\2))]',
+            code
+        )
+        
+        # Tối ưu string concatenation
+        code = re.sub(
+            r'(["\'])([^\1]*?)\1\s*\+\s*(["\'])([^\3]*?)\3',
+            r'"\2\4"',
+            code
+        )
+        
+        return code
+    
+    @staticmethod
+    def combined_optimize(code):
+        """Kết hợp các kỹ thuật tối ưu"""
+        code = MultiStageOptimizer.basic_fix(code)
+        code = MultiStageOptimizer.advanced_fix(code)
+        code = MultiStageOptimizer.structure_optimize(code)
+        code = MultiStageOptimizer.performance_optimize(code)
+        return code
+    
+    @staticmethod
+    def validate_code(code):
+        """Kiểm tra code có hợp lệ không"""
+        try:
+            ast.parse(code)
+            return True
+        except:
+            return False
+    
+    @staticmethod
+    def score_code(code):
+        """Đánh giá chất lượng code"""
+        score = 0
+        
+        try:
+            tree = ast.parse(code)
+            
+            # Điểm cho code hợp lệ
+            score += 50
+            
+            # Điểm cho docstring
+            if ast.get_docstring(tree):
+                score += 10
+            
+            # Điểm cho số lượng hàm
+            functions = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
+            score += min(len(functions) * 2, 20)
+            
+            # Điểm cho số lượng class
+            classes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
+            score += min(len(classes) * 3, 15)
+            
+            # Điểm cho import có tổ chức
+            imports = [node for node in ast.walk(tree) if isinstance(node, (ast.Import, ast.ImportFrom))]
+            score += min(len(imports), 5)
+            
+            # Điểm cho code ngắn gọn
+            lines = len(code.splitlines())
+            if lines < 50:
+                score += 10
+            elif lines < 100:
+                score += 5
+            
+        except:
+            score = 0
+        
+        return score
+
+# =====================================================================
+# [MỚI] BỘ THỐNG KÊ VÀ PHÂN TÍCH CODE
+# =====================================================================
+
+class CodeAnalyzer:
+    """Phân tích và thống kê code"""
+    
+    @staticmethod
+    def analyze_code(code):
+        """Phân tích code và trả về thống kê chi tiết"""
+        stats = {
+            "lines": 0,
+            "code_lines": 0,
+            "comment_lines": 0,
+            "blank_lines": 0,
+            "functions": 0,
+            "classes": 0,
+            "imports": 0,
+            "complexity": 0,
+            "issues": [],
+            "suggestions": []
+        }
+        
+        lines = code.splitlines()
+        stats["lines"] = len(lines)
+        
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                stats["blank_lines"] += 1
+            elif stripped.startswith("#"):
+                stats["comment_lines"] += 1
+            else:
+                stats["code_lines"] += 1
+        
+        try:
+            tree = ast.parse(code)
+            
+            # Đếm functions và classes
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    stats["functions"] += 1
+                elif isinstance(node, ast.ClassDef):
+                    stats["classes"] += 1
+                elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                    stats["imports"] += 1
+            
+            # Tính độ phức tạp (số lượng nodes trong AST)
+            stats["complexity"] = sum(1 for _ in ast.walk(tree))
+            
+            # Phát hiện issues
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Try):
+                    if not node.handlers and not node.finalbody:
+                        stats["issues"].append("Try block không có except hoặc finally")
+                
+                if isinstance(node, ast.FunctionDef):
+                    if len(node.body) > 50:
+                        stats["suggestions"].append(f"Function {node.name} quá dài ({len(node.body)} lines)")
+                    
+                    args = [arg.arg for arg in node.args.args]
+                    if len(args) > 5:
+                        stats["suggestions"].append(f"Function {node.name} có quá nhiều tham số ({len(args)})")
+            
+        except:
+            stats["issues"].append("Code có lỗi cú pháp")
+        
+        return stats
 
 # =====================================================================
 # TỰ ĐỘNG KIỂM TRA VÀ CÀI ĐẶT THƯ VIỆN CHO CHÍNH NÓ (NẾU THIẾU)
@@ -225,6 +625,8 @@ LANGUAGES = {
         "btn_copy": "📋 Sao chép (Copy)",
         "btn_download": "💾 Tải xuống (.py)",
         "btn_trigger_fix": "⚡ BẮT ĐẦU QUÉT & TỰ ĐỘNG SỬA CODE MẠNH MẼ",
+        "btn_analyze": "📊 PHÂN TÍCH CODE CHI TIẾT",
+        "btn_install_missing": "📦 CÀI ĐẶT THƯ VIỆN THIẾU",
         "abort_msg": "⚠️ [HỆ THỐNG] ĐÃ BẤM DỪNG KHẨN CẤP! Đang ngắt luồng xử lý...",
         "success": "Thành công",
         "warning": "Cảnh báo",
@@ -237,7 +639,6 @@ LANGUAGES = {
         "up_to_date": "Tuyệt vời! Bạn đang sử dụng phiên bản mới nhất trên GitHub!",
         "update_found": "Phát hiện phiên bản mới: {new_ver}!\nBạn có muốn tự động tải về và nâng cấp ngay lập tức không?",
         "updating": "Đang tiến hành tải bản cập nhật mới...",
-        # [MỚI] Thêm key cho chế độ dự phòng
         "safe_mode_title": "⚠️ PHẦN MỀM ĐANG Ở CHẾ ĐỘ DỰ PHÒNG",
         "safe_mode_desc": "Phát hiện lỗi nghiêm trọng trong file hiện tại!\n\nLỗi: {error}\n\nBạn có muốn rollback về phiên bản an toàn đã được lưu trước đó không?",
         "btn_rollback": "🔄 ROLLBACK VỀ PHIÊN BẢN CŨ",
@@ -280,6 +681,8 @@ LANGUAGES = {
         "btn_copy": "📋 Copy Code",
         "btn_download": "💾 Download (.py)",
         "btn_trigger_fix": "⚡ START DEEP SCAN & POWERFUL FIX",
+        "btn_analyze": "📊 DETAILED CODE ANALYSIS",
+        "btn_install_missing": "📦 INSTALL MISSING LIBRARIES",
         "abort_msg": "⚠️ [SYSTEM] EMERGENCY STOP TRIGGERED! Terminating processes...",
         "success": "Success",
         "warning": "Warning",
@@ -292,7 +695,6 @@ LANGUAGES = {
         "up_to_date": "Great! You are running the latest version available on GitHub!",
         "update_found": "New update available: {new_ver}!\nWould you like to automatically download and upgrade now?",
         "updating": "Downloading update and applying changes automatically...",
-        # [MỚI] Thêm key cho chế độ dự phòng
         "safe_mode_title": "⚠️ SOFTWARE IN SAFE MODE",
         "safe_mode_desc": "Critical error detected in current file!\n\nError: {error}\n\nDo you want to rollback to the previously saved safe version?",
         "btn_rollback": "🔄 ROLLBACK TO PREVIOUS VERSION",
@@ -309,12 +711,10 @@ class PythonDeveloperToolGUI:
         self.current_lang = "vi"
         self.is_aborted = False
         self.current_thread = None
-        # [MỚI] Biến đánh dấu chế độ dự phòng
         self.safe_mode_active = False
         
         # [MỚI] Kiểm tra và xử lý file bị hỏng trước khi khởi tạo UI
         if not self.handle_corruption_check():
-            # Nếu không thể xử lý, thoát
             sys.exit(1)
         
         self.init_ui()
@@ -324,44 +724,32 @@ class PythonDeveloperToolGUI:
     
     # [MỚI] Hàm kiểm tra và xử lý lỗi
     def handle_corruption_check(self):
-        """Kiểm tra và xử lý khi file bị hỏng"""
         try:
-            # Tạo trạng thái an toàn nếu chưa có
             SafeModeManager.create_first_safe_state()
-            
-            # Kiểm tra tính toàn vẹn
             is_valid, msg = SafeModeManager.check_file_integrity()
             
             if not is_valid:
-                # File bị hỏng, hiển thị dialog rollback
                 self.safe_mode_active = True
                 response = messagebox.askyesno(
                     "⚠️ PHẦN MỀM BỊ LỖI",
-                    f"Phát hiện lỗi nghiêm trọng trong file phần mềm!\n\nLỗi: {msg}\n\nBạn có muốn rollback về phiên bản an toàn đã được lưu trước đó không?\n\n(Chọn 'Có' để rollback, 'Không' để tiếp tục với chế độ dự phòng)"
+                    f"Phát hiện lỗi nghiêm trọng trong file phần mềm!\n\nLỗi: {msg}\n\nBạn có muốn rollback về phiên bản an toàn đã được lưu trước đó không?"
                 )
                 
                 if response:
-                    # Rollback về phiên bản an toàn
                     success, result = SafeModeManager.rollback_to_safe_version()
                     if success:
                         messagebox.showinfo("Thành công", "Rollback thành công! Phần mềm sẽ tự động khởi động lại.")
-                        # Khởi động lại chương trình
                         self.restart_application()
                         return False
                     else:
-                        messagebox.showerror("Lỗi rollback", f"Không thể rollback: {result}\n\nPhần mềm sẽ tiếp tục ở chế độ dự phòng.")
-                else:
-                    # Tiếp tục với chế độ dự phòng
-                    messagebox.showwarning("Chế độ dự phòng", "Phần mềm sẽ chạy ở chế độ dự phòng. Một số tính năng có thể không hoạt động bình thường.")
+                        messagebox.showerror("Lỗi rollback", f"Không thể rollback: {result}")
             return True
         except Exception as e:
-            messagebox.showerror("Lỗi nghiêm trọng", f"Không thể kiểm tra tính toàn vẹn file: {e}\n\nPhần mềm sẽ chạy ở chế độ dự phòng.")
+            messagebox.showerror("Lỗi nghiêm trọng", f"Không thể kiểm tra tính toàn vẹn file: {e}")
             self.safe_mode_active = True
             return True
     
-    # [MỚI] Hàm khởi động lại ứng dụng
     def restart_application(self):
-        """Khởi động lại ứng dụng"""
         try:
             python = sys.executable
             os.execl(python, python, *sys.argv)
@@ -387,7 +775,6 @@ class PythonDeveloperToolGUI:
         self.title_frame = Frame(self.root, bg="#2c3e50")
         self.title_frame.pack(fill=X)
         
-        # [MỚI] Thêm indicator chế độ dự phòng
         if self.safe_mode_active:
             self.safe_indicator = Label(self.title_frame, text="⚠️ SAFE MODE", font=("Helvetica", 11, "bold"), fg="#ff6b6b", bg="#2c3e50", pady=10)
             self.safe_indicator.pack(side=LEFT, padx=15)
@@ -430,7 +817,6 @@ class PythonDeveloperToolGUI:
         self.btn5 = Button(self.left_menu, text="", command=self.show_about_software, **self.btn_style)
         self.btn5.pack(fill=X, pady=4)
         
-        # [MỚI] Nút Rollback trên menu
         self.btn_rollback = Button(self.left_menu, text="🔄 Rollback", font=("Segoe UI", 10, "bold"), bg="#e67e22", fg="white", activebackground="#d35400", activeforeground="white", pady=8, bd=0, cursor="hand2", command=self.manual_rollback)
         self.btn_rollback.pack(fill=X, pady=4)
         
@@ -454,7 +840,6 @@ class PythonDeveloperToolGUI:
         scrollbar.pack(side=RIGHT, fill=Y)
         self.log_text.pack(fill=BOTH, expand=True)
         
-        # [MỚI] Log thông báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             self.log(LANGUAGES[self.current_lang]["safe_mode_active"])
 
@@ -480,7 +865,6 @@ class PythonDeveloperToolGUI:
         self.btn5.config(text=lang["btn_about"])
         self.btn_abort.config(text=lang["btn_abort"])
         self.lbl_log.config(text=lang["console_log"])
-        # [MỚI] Cập nhật text cho nút rollback
         self.btn_rollback.config(text=lang.get("btn_rollback", "🔄 Rollback"))
         self.show_welcome()
 
@@ -511,9 +895,7 @@ class PythonDeveloperToolGUI:
         lbl = Label(self.right_content, text=LANGUAGES[self.current_lang]["welcome"], font=("Segoe UI", 12), bg="white", fg="#555", pady=50)
         lbl.pack(fill=BOTH, expand=True)
 
-    # [MỚI] Hàm rollback thủ công
     def manual_rollback(self):
-        """Thực hiện rollback thủ công từ menu"""
         lang = LANGUAGES[self.current_lang]
         state = SafeModeManager.load_safe_state()
         
@@ -523,7 +905,7 @@ class PythonDeveloperToolGUI:
         
         response = messagebox.askyesno(
             lang["notice"],
-            f"Bạn có chắc muốn rollback về phiên bản {state.get('version', 'unknown')} không?\n\n(Thao tác này sẽ khôi phục file phần mềm về trạng thái an toàn đã được lưu trước đó)"
+            f"Bạn có chắc muốn rollback về phiên bản {state.get('version', 'unknown')} không?"
         )
         
         if response:
@@ -536,7 +918,7 @@ class PythonDeveloperToolGUI:
             else:
                 messagebox.showerror(lang["error"], f"Rollback thất bại: {result}")
 
-    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN (TUPLE INT COMPARISON) ====================
+    # ==================== FIX ĐỐI CHIẾU PHIÊN BẢN ====================
     def check_for_updates(self, is_manual=False):
         lang = LANGUAGES[self.current_lang]
         self.log(lang["checking_update"])
@@ -551,7 +933,6 @@ class PythonDeveloperToolGUI:
                 latest_version = match.group(1).strip()
                 self.log(f"[Update Checker] Local: {VERSION} | Live GitHub: {latest_version}")
                 
-                # SỬA LỖI TẠI ĐÂY: Dùng bộ so sánh Tuple số nguyên thay vì chuỗi
                 if self.is_newer_version(VERSION, latest_version):
                     self.log(f"New update found: {latest_version}")
                     self.root.after(100, lambda: self.ask_for_update(latest_version))
@@ -562,19 +943,17 @@ class PythonDeveloperToolGUI:
             else:
                 self.log("[Update Checker] Khong tim thay chuoi 'Latest version: X.X.X' trong file README trên GitHub.")
                 if is_manual: 
-                    messagebox.showwarning(lang["warning"], "Không tìm thấy cấu trúc thông tin phiên bản hợp lệ trên GitHub (Hãy kiểm tra lại file README.md).")
+                    messagebox.showwarning(lang["warning"], "Không tìm thấy cấu trúc thông tin phiên bản hợp lệ trên GitHub.")
         except Exception as e:
             self.log(f"[Update Checker] Lỗi kết nối: {e}")
             if is_manual: messagebox.showerror(lang["error"], f"Lỗi kết nối máy chủ GitHub: {e}")
 
     def is_newer_version(self, current, latest):
         try:
-            # Chuyển đổi định dạng "2.5.0" -> [2, 5, 0] để so sánh đại số chính xác
             c_parts = [int(x) for x in current.split(".")]
             l_parts = [int(x) for x in latest.split(".")]
             return l_parts > c_parts
         except Exception:
-            # Dự phòng nếu chuỗi không hợp lệ
             return latest != current
 
     def ask_for_update(self, new_ver):
@@ -593,7 +972,6 @@ class PythonDeveloperToolGUI:
                 
             current_file_path = os.path.abspath(sys.argv[0])
             
-            # [SỬA] Lưu trạng thái an toàn trước khi update
             with open(current_file_path, "rb") as f:
                 content = f.read()
                 file_hash = hashlib.sha256(content).hexdigest()
@@ -620,7 +998,6 @@ class PythonDeveloperToolGUI:
         lbl_title = Label(self.right_content, text=lang["about_title"], font=("Segoe UI", 13, "bold"), bg="white", fg="#2c3e50")
         lbl_title.pack(anchor="w", pady=10)
         
-        # [MỚI] Thêm thông tin về chế độ dự phòng
         status_text = ""
         if self.safe_mode_active:
             status_text = "\n⚠️ CHẾ ĐỘ DỰ PHÒNG ĐANG HOẠT ĐỘNG"
@@ -635,7 +1012,6 @@ class PythonDeveloperToolGUI:
         Label(info_frame, text=f"Local Version: {VERSION}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
         Label(info_frame, text=f"Author Email: {AUTHOR_EMAIL}", font=("Consolas", 10), bg="#f8f9fa").pack(anchor="w")
         
-        # [MỚI] Hiển thị thông tin backup
         state = SafeModeManager.load_safe_state()
         if state:
             backup_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(state.get("timestamp", 0)))
@@ -647,7 +1023,6 @@ class PythonDeveloperToolGUI:
         btn_update = Button(self.right_content, text=lang["btn_manual_update"], font=("Segoe UI", 11, "bold"), bg="#2980b9", fg="white", bd=0, pady=12, command=trigger_manual_update_check)
         btn_update.pack(fill=X, pady=15)
         
-        # [MỚI] Thêm nút Rollback ở đây
         btn_rollback_about = Button(self.right_content, text="🔄 Rollback về bản an toàn", font=("Segoe UI", 11, "bold"), bg="#e67e22", fg="white", bd=0, pady=12, command=self.manual_rollback)
         btn_rollback_about.pack(fill=X, pady=5)
 
@@ -656,7 +1031,6 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
-        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -723,7 +1097,6 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
-        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -789,7 +1162,6 @@ class PythonDeveloperToolGUI:
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
-        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -930,12 +1302,11 @@ class PythonDeveloperToolGUI:
             with open(py_file, "w", encoding="utf-8") as f: f.writelines(new_lines)
             self.log(f"Fixed & Backed up: {os.path.basename(py_file)}")
 
-    # ==================== LIVE CODE FIXER ====================
+    # ==================== LIVE CODE FIXER (NÂNG CẤP) ====================
     def show_paste_code_fixer(self):
         self.clear_right_content()
         lang = LANGUAGES[self.current_lang]
         
-        # [MỚI] Thêm cảnh báo nếu đang ở chế độ dự phòng
         if self.safe_mode_active:
             warning_lbl = Label(self.right_content, text="⚠️ CHẾ ĐỘ DỰ PHÒNG - Một số tính năng có thể không ổn định", font=("Segoe UI", 10, "bold"), bg="white", fg="#e74c3c")
             warning_lbl.pack(anchor="w", pady=5)
@@ -964,16 +1335,134 @@ class PythonDeveloperToolGUI:
         self.txt_output_code = Text(right_panel, font=("Consolas", 10), bg="#2d2d2d", fg="#f8f8f2", bd=1, relief="solid")
         self.txt_output_code.pack(fill=BOTH, expand=True)
         
-        Button(self.right_content, text=lang["btn_trigger_fix"], font=("Segoe UI", 11, "bold"), bg="#27ae60", fg="white", bd=0, pady=10, command=self.action_fix_pasted_code).pack(fill=X, pady=(10, 5))
+        # [MỚI] Toolbar cho các chức năng nâng cao
+        action_frame = Frame(self.right_content, bg="white")
+        action_frame.pack(fill=X, pady=5)
+        
+        Button(action_frame, text=lang["btn_trigger_fix"], font=("Segoe UI", 11, "bold"), bg="#27ae60", fg="white", bd=0, pady=10, command=self.action_fix_pasted_code).pack(side=LEFT, expand=True, fill=X, padx=2)
+        Button(action_frame, text=lang["btn_analyze"], font=("Segoe UI", 11, "bold"), bg="#2980b9", fg="white", bd=0, pady=10, command=self.analyze_pasted_code).pack(side=LEFT, expand=True, fill=X, padx=2)
+        Button(action_frame, text=lang["btn_install_missing"], font=("Segoe UI", 11, "bold"), bg="#e67e22", fg="white", bd=0, pady=10, command=self.install_missing_libs).pack(side=LEFT, expand=True, fill=X, padx=2)
 
     def action_fix_pasted_code(self):
+        """Fix code với nhiều lần thử và chọn kết quả tốt nhất"""
         raw_code = self.txt_input_code.get("1.0", END)
-        if not raw_code.strip(): return
-        lines = raw_code.splitlines(keepends=True)
+        if not raw_code.strip(): 
+            messagebox.showwarning("Cảnh báo", "Vui lòng nhập code cần sửa!")
+            return
         
-        fixed, fixed_lines = self.core_fix_algorithm_advanced(lines)
-        self.txt_output_code.delete("1.0", END)
-        self.txt_output_code.insert("1.0", "".join(fixed_lines))
+        self.log("Bắt đầu quá trình fix code đa tầng...")
+        
+        # Sử dụng MultiStageOptimizer để fix code
+        try:
+            optimized = MultiStageOptimizer.optimize_code(raw_code, max_attempts=10)
+            
+            # So sánh kết quả với code gốc
+            if optimized != raw_code:
+                self.log("Code đã được tối ưu thành công!")
+                
+                # Phân tích code sau khi fix
+                stats = CodeAnalyzer.analyze_code(optimized)
+                self.log(f"Đã fix: {stats['issues'] if stats['issues'] else 'Không phát hiện lỗi'}")
+                
+                self.txt_output_code.delete("1.0", END)
+                self.txt_output_code.insert("1.0", optimized)
+            else:
+                self.log("Không thể tối ưu code, giữ nguyên bản gốc")
+                self.txt_output_code.delete("1.0", END)
+                self.txt_output_code.insert("1.0", raw_code)
+                
+        except Exception as e:
+            self.log(f"Lỗi trong quá trình fix: {e}")
+            messagebox.showerror("Lỗi", f"Không thể fix code: {e}")
+    
+    def analyze_pasted_code(self):
+        """Phân tích chi tiết code"""
+        code = self.txt_input_code.get("1.0", END)
+        if not code.strip():
+            messagebox.showwarning("Cảnh báo", "Vui lòng nhập code cần phân tích!")
+            return
+        
+        self.log("Đang phân tích code...")
+        
+        try:
+            stats = CodeAnalyzer.analyze_code(code)
+            
+            # Tạo báo cáo chi tiết
+            report = f"""
+📊 PHÂN TÍCH CODE CHI TIẾT
+{'='*50}
+
+📈 THỐNG KÊ:
+- Tổng số dòng: {stats['lines']}
+- Dòng code: {stats['code_lines']}
+- Dòng comment: {stats['comment_lines']}
+- Dòng trống: {stats['blank_lines']}
+
+🏗️ CẤU TRÚC:
+- Số hàm: {stats['functions']}
+- Số class: {stats['classes']}
+- Số import: {stats['imports']}
+- Độ phức tạp: {stats['complexity']}
+
+🚨 VẤN ĐỀ PHÁT HIỆN:
+{chr(10).join(['- ' + issue for issue in stats['issues']]) if stats['issues'] else '✅ Không phát hiện lỗi'}
+
+💡 GỢI Ý CẢI THIỆN:
+{chr(10).join(['- ' + suggestion for suggestion in stats['suggestions']]) if stats['suggestions'] else '✅ Code đã được tối ưu tốt'}
+
+🔍 THƯ VIỆN SỬ DỤNG:
+{chr(10).join(['- ' + lib for lib in LibraryManager.scan_imports(code)]) if LibraryManager.scan_imports(code) else 'Không sử dụng thư viện bên ngoài'}
+
+📦 THƯ VIỆN THIẾU:
+{chr(10).join(['- ' + lib for lib in LibraryManager.detect_missing_libraries(code)]) if LibraryManager.detect_missing_libraries(code) else '✅ Tất cả thư viện đã được cài đặt'}
+"""
+            
+            # Hiển thị báo cáo trong output
+            self.txt_output_code.delete("1.0", END)
+            self.txt_output_code.insert("1.0", report)
+            self.log("Phân tích code hoàn tất!")
+            
+            # Hiện thông báo tóm tắt
+            messagebox.showinfo(
+                "Phân tích hoàn tất",
+                f"Tìm thấy {len(stats['issues'])} vấn đề và {len(stats['suggestions'])} gợi ý cải thiện."
+            )
+            
+        except Exception as e:
+            self.log(f"Lỗi phân tích: {e}")
+            messagebox.showerror("Lỗi", f"Không thể phân tích code: {e}")
+    
+    def install_missing_libs(self):
+        """Tự động cài đặt thư viện thiếu"""
+        code = self.txt_input_code.get("1.0", END)
+        if not code.strip():
+            messagebox.showwarning("Cảnh báo", "Vui lòng nhập code để kiểm tra thư viện!")
+            return
+        
+        self.log("Đang kiểm tra thư viện thiếu...")
+        
+        def install_callback(msg):
+            self.log(msg)
+        
+        try:
+            result = LibraryManager.auto_install_missing_libraries(code, install_callback)
+            
+            if result["success"]:
+                msg = f"✅ {result['message']}"
+                if result["installed"]:
+                    msg += f"\nĐã cài: {', '.join(result['installed'])}"
+                messagebox.showinfo("Thành công", msg)
+            else:
+                msg = f"⚠️ {result['message']}"
+                if result["failed"]:
+                    msg += f"\nKhông cài được: {', '.join(result['failed'])}"
+                messagebox.showwarning("Cảnh báo", msg)
+                
+            self.log(result["message"])
+            
+        except Exception as e:
+            self.log(f"Lỗi cài đặt: {e}")
+            messagebox.showerror("Lỗi", f"Không thể cài đặt thư viện: {e}")
 
     def copy_to_clipboard(self):
         content = self.txt_output_code.get("1.0", END).rstrip()
